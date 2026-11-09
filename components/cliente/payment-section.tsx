@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, CreditCard, Lock, QrCode, Smartphone, UserRound } from 'lucide-react'
+import { AlertTriangle, Clock, CreditCard, Lock, QrCode, Smartphone, UserRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, sedeShort, type Sede } from '@/lib/store-data'
 import { useStore, type PaymentMethod } from '@/components/store-provider'
@@ -13,21 +13,6 @@ const METHODS: { value: PaymentMethod; icon: typeof CreditCard }[] = [
   { value: 'Plin', icon: Smartphone },
 ]
 
-const HORARIOS = [
-  '08:00 - 09:00',
-  '09:00 - 10:00',
-  '10:00 - 11:00',
-  '11:00 - 12:00',
-  '12:00 - 13:00',
-  '13:00 - 14:00',
-  '14:00 - 15:00',
-  '15:00 - 16:00',
-  '16:00 - 17:00',
-  '17:00 - 18:00',
-  '18:00 - 19:00',
-  '19:00 - 20:00',
-]
-
 export interface ConfirmedOrder {
   orderId: string
   customer: string
@@ -35,8 +20,8 @@ export interface ConfirmedOrder {
   substituted: number
   sede: Sede
   payment: PaymentMethod
-  pickupTime: string
   phoneNumber: string
+  pickupTime: string
 }
 
 const inputClass =
@@ -47,8 +32,7 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
   const [method, setMethod] = useState<PaymentMethod>('Tarjeta')
   const [substitution, setSubstitution] = useState(true)
   const [card, setCard] = useState({ number: '', expiry: '', cvv: '' })
-  const [phone, setPhone] = useState('')
-  const [pickupTime, setPickupTime] = useState(HORARIOS[0])
+  const [time, setTime] = useState('Lo antes posible (30 min)')
   const [error, setError] = useState('')
 
   const formatCard = (v: string) =>
@@ -64,16 +48,11 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
 
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault()
-    
-    if (!/^9\d{8}$/.test(phone)) {
-      return setError('Ingresa un número de celular válido de 9 dígitos que empiece con 9.')
-    }
-
     if (method === 'Tarjeta') {
       if (card.number.replace(/\s/g, '').length !== 16) return setError('Ingresa un número de tarjeta válido de 16 dígitos.')
       if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(card.expiry)) return setError('Ingresa una fecha de vencimiento válida (MM/AA).')
       if (!/^\d{3,4}$/.test(card.cvv)) return setError('Ingresa un CVV válido.')
-    } 
+    }
     
     setError('')
     const result = placeOrder(method, substitution)
@@ -84,12 +63,12 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
       return setError('Tu carrito está vacío.')
     }
     
-    onPaid({ 
-      ...result, 
-      sede, 
-      payment: method, 
-      pickupTime, 
-      phoneNumber: phone 
+    onPaid({
+      ...result,
+      sede,
+      payment: method,
+      phoneNumber: user!.phone,
+      pickupTime: time,
     })
   }
 
@@ -101,7 +80,7 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
           <div>
             <p className="text-sm font-bold">Inicia sesión para comprar</p>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Necesitamos tu nombre y apellido para registrar el pedido y entregártelo en tienda.
+              Necesitamos tu nombre y celular para registrar el pedido y entregártelo en tienda.
             </p>
           </div>
         </div>
@@ -127,56 +106,37 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
 
   return (
     <form onSubmit={handlePay} className="flex flex-col gap-5 p-5" noValidate>
-      <div className="flex items-center gap-3 rounded-xl bg-muted/50 px-4 py-3 text-sm">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-yellow text-xs font-black text-brand-yellow-foreground">
-          {user.firstName[0]}
-          {user.lastName[0]}
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Pedido a nombre de</p>
-          <p className="truncate font-bold">
-            {user.firstName} {user.lastName}
-          </p>
+      <div className="flex items-center justify-between rounded-xl bg-muted/50 px-4 py-3 text-sm">
+        <div className="flex items-center gap-3">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-yellow text-xs font-black text-brand-yellow-foreground">
+            {user.firstName[0]}
+            {user.lastName[0]}
+          </span>
+          <div className="min-w-0">
+            <p className="text-xs text-muted-foreground">Pedido a nombre de</p>
+            <p className="truncate font-bold">
+              {user.firstName} {user.lastName}
+            </p>
+          </div>
         </div>
       </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="horario" className="text-sm font-semibold">
-          Horario de Recojo
+      
+      <div className="flex flex-col gap-2">
+        <label htmlFor="horario" className="flex items-center gap-2 text-sm font-bold">
+          <Clock className="size-4 text-primary" />
+          Horario de recojo en tienda
         </label>
         <select
           id="horario"
-          value={pickupTime}
-          onChange={(e) => setPickupTime(e.target.value)}
+          value={time}
+          onChange={(e) => setTime(e.target.value)}
           className={inputClass}
         >
-          {HORARIOS.map((hora) => (
-            <option key={hora} value={hora}>
-              {hora}
-            </option>
-          ))}
+          <option value="Lo antes posible (30 min)">Lo antes posible (30 min)</option>
+          <option value="Mañana (9:00 - 12:00)">Mañana (9:00 - 12:00)</option>
+          <option value="Tarde (13:00 - 17:00)">Tarde (13:00 - 17:00)</option>
+          <option value="Noche (18:00 - 21:00)">Noche (18:00 - 21:00)</option>
         </select>
-      </div>
-
-      <div className="flex w-full flex-col gap-1.5">
-        <label htmlFor="celular-general" className="text-sm font-semibold">
-          Número de celular
-        </label>
-        <div className="flex">
-          <span className="flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground">
-            +51
-          </span>
-          <input
-            id="celular-general"
-            type="tel"
-            inputMode="numeric"
-            autoComplete="tel-national"
-            placeholder="987 654 321"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 9))}
-            className={cn(inputClass, 'rounded-l-none')}
-          />
-        </div>
       </div>
 
       <div
@@ -187,9 +147,9 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
       >
         <div>
           <p className="text-sm font-semibold" id="label-sustitucion">
-            Aceptar sustitución automática si se agota
+            Aceptar sustitución automática
           </p>
-          <p className="text-xs text-muted-foreground">Te enviaremos un producto similar de igual o menor precio.</p>
+          <p className="text-xs text-muted-foreground">Te enviaremos un producto similar de igual o menor precio si algo se agota.</p>
         </div>
         <Switch checked={substitution} onChange={setSubstitution} label="Aceptar sustitución automática si se agota" />
       </div>
@@ -266,7 +226,7 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-4 rounded-xl border border-border p-4">
+            <div className="flex flex-col items-center gap-4 rounded-xl border border-border p-4 text-center">
               <div
                 className={cn(
                   'flex size-40 flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed',
@@ -278,8 +238,8 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
                 <QrCode className="size-14 opacity-60" aria-hidden="true" />
                 <span className="text-xs font-semibold">QR de {method}</span>
               </div>
-              <p className="text-center text-xs text-muted-foreground">
-                Escanea el código desde tu app {method} para realizar el pago.
+              <p className="text-xs text-muted-foreground">
+                Escanea el código para pagar. Usaremos el celular registrado en tu cuenta (<strong className="text-foreground">{user.phone}</strong>) para confirmar la transacción automáticamente.
               </p>
             </div>
           )}
