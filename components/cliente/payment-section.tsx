@@ -55,7 +55,10 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
     }
     
     setError('')
-    const result = placeOrder(method, substitution)
+    
+    // AHORA PASAMOS EL TIEMPO A LA MEMORIA CENTRAL
+    const result = placeOrder(method, substitution, time)
+    
     if (!result.ok) {
       if (result.reason === 'auth') return openAuth('login')
       if (result.reason === 'substitution')
