@@ -14,7 +14,6 @@ import {
 
 export type PaymentMethod = Order['payment']
 
-// NUEVO: Extendemos la orden para que guarde el horario
 export type AppOrder = Order & { pickupTime?: string }
 
 export interface CartLine {
@@ -107,7 +106,7 @@ interface StoreContextValue {
   resolveComplaint: (id: string, status: 'Aprobado' | 'Rechazado', text: string) => void
   addTicket: (topic: string, detail: string, urgent: boolean) => void
   resolveTicket: (id: string, status: 'En revisión' | 'Resuelto', text?: string) => void
-  placeOrder: (payment: PaymentMethod, substitution: boolean, pickupTime: string) => PlaceOrderResult // ACTUALIZADO
+  placeOrder: (payment: PaymentMethod, substitution: boolean, pickupTime: string) => PlaceOrderResult
   toast: string | null
   showToast: (message: string) => void
 }
@@ -253,6 +252,27 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setAccounts((prev) => [...prev, account])
       const { password: _password, ...customer } = account
       setUser(customer)
+
+      // NUEVO: Enviar el registro al Excel de clientes
+      fetch('https://sheetdb.io/api/v1/0793nb34hurdw', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          data: [
+            {
+              'Nombre': account.firstName,
+              'Apellido': account.lastName,
+              'celular': account.phone,
+              'correo electrónico': account.email,
+              'contraseña': account.password,
+            },
+          ],
+        }),
+      }).catch(() => {})
+
       return null
     },
     [accounts],
@@ -408,7 +428,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           customer,
           sede,
           payment,
-          pickupTime, // AQUI GUARDAMOS EL HORARIO
+          pickupTime,
           slaSeconds,
           deadline: Date.now() + slaSeconds * 1000,
           substitution,
