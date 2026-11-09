@@ -253,23 +253,17 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const { password: _password, ...customer } = account
       setUser(customer)
 
-      // NUEVO: Enviar el registro al Excel de clientes
       fetch('https://sheetdb.io/api/v1/0793nb34hurdw', {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          data: [
-            {
-              'Nombre': account.firstName,
-              'Apellido': account.lastName,
-              'celular': account.phone,
-              'correo electrónico': account.email,
-              'contraseña': account.password,
-            },
-          ],
+          data: [{
+            'Nombre': account.firstName,
+            'Apellido': account.lastName,
+            'celular': account.phone,
+            'correo electrónico': account.email,
+            'contraseña': account.password,
+          }],
         }),
       }).catch(() => {})
 
@@ -283,12 +277,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const cleanEmail = email.trim().toLowerCase()
       const cleanPassword = password.trim()
       const account = accounts.find((a) => a.email.trim().toLowerCase() === cleanEmail)
-      if (!account) {
-        return 'No existe ninguna cuenta registrada con este correo. Regístrate primero.'
-      }
-      if (account.password.trim() !== cleanPassword) {
-        return 'Contraseña incorrecta.'
-      }
+      if (!account) return 'No existe ninguna cuenta registrada con este correo.'
+      if (account.password.trim() !== cleanPassword) return 'Contraseña incorrecta.'
       const { password: _password, ...customer } = account
       setUser(customer)
       return null
@@ -350,6 +340,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       })
       setReadyCount((n) => n + 1)
       showToast(`Pedido ${id} listo para recojo`)
+
+      // ACTUALIZA ESTADO A "Listo para recoger" EN EL EXCEL
+      fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+        method: 'PATCH',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { 'Estado': 'Listo para recoger' } })
+      }).catch(() => {})
     },
     [showToast],
   )
@@ -368,6 +365,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return prev.filter((o) => o.id !== id)
       })
       showToast(`Pedido ${id} entregado al cliente`)
+
+      // ACTUALIZA ESTADO A "Entregado" EN EL EXCEL
+      fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+        method: 'PATCH',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { 'Estado': 'Entregado' } })
+      }).catch(() => {})
     },
     [showToast],
   )
@@ -386,9 +390,22 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   )
 
   const resolveComplaint = useCallback((id: string, status: 'Aprobado' | 'Rechazado', text: string) => {
-    setComplaints((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, resolutionStatus: status, resolutionText: text } : c))
-    )
+    setComplaints((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, resolutionStatus: status, resolutionText: text } : c));
+      const target = next.find(c => c.id === id);
+      
+      // ACTUALIZA REEMBOLSO EN EL EXCEL SI SE APRUEBA O RECHAZA
+      if (target && target.orderId) {
+        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${target.orderId}`, {
+          method: 'PATCH',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            data: { 'Reembolso': status === 'Aprobado' ? 'Reembolso procesado' : 'Rechazado' }
+          })
+        }).catch(() => {})
+      }
+      return next;
+    })
     showToast(`Reclamo ${id} marcado como ${status}`)
   }, [showToast])
 
@@ -447,46 +464,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   )
 
   const value: StoreContextValue = {
-    startShift,
-    products,
-    setStock,
-    setStockAllSedes,
-    user,
-    register,
-    login,
-    logout,
-    authMode,
-    openAuth,
-    closeAuth,
-    unavailableCount,
-    cart,
-    cartCount,
-    cartTotal,
-    qtyInCart,
-    addToCart,
-    updateQty,
-    clearCart,
-    search,
-    setSearch,
-    category,
-    setCategory,
-    sede,
-    setSede,
-    orders,
-    completedOrders,
-    deliveredOrders,
-    complaints,
-    tickets,
-    readyCount,
-    completeOrder,
-    deliverOrder,
-    addComplaint,
-    resolveComplaint,
-    addTicket,
-    resolveTicket,
-    placeOrder,
-    toast,
-    showToast,
+    startShift, products, setStock, setStockAllSedes, user, register, login, logout, authMode, openAuth,
+    closeAuth, unavailableCount, cart, cartCount, cartTotal, qtyInCart, addToCart, updateQty, clearCart,
+    search, setSearch, category, setCategory, sede, setSede, orders, completedOrders, deliveredOrders,
+    complaints, tickets, readyCount, completeOrder, deliverOrder, addComplaint, resolveComplaint, addTicket,
+    resolveTicket, placeOrder, toast, showToast,
   }
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
@@ -497,3 +479,4 @@ export function useStore() {
   if (!ctx) throw new Error('useStore debe usarse dentro de StoreProvider')
   return ctx
 }
+  
