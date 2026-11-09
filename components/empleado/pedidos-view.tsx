@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, CheckCircle2, Inbox, QrCode, RefreshCw, ScanLine, Timer } from 'lucide-react'
+import { Check, CheckCircle2, Inbox, QrCode, RefreshCw, ScanLine, Timer, Edit3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
 import { useStore } from '@/components/store-provider'
@@ -31,6 +31,11 @@ function timerTone(seconds: number) {
   return 'text-success'
 }
 
+// Interfaz extendida para guardar la nota de sustitución
+interface CompletedOrder extends Order {
+  substitutionNote?: string
+}
+
 export function PedidosView() {
   const { orders, completeOrder } = useStore()
   const now = useNow()
@@ -38,62 +43,142 @@ export function PedidosView() {
   const [scannerOpen, setScannerOpen] = useState(false)
   const [validated, setValidated] = useState<Record<string, boolean>>({})
   const [picked, setPicked] = useState<Record<string, boolean>>({})
+  
+  // Nuevos estados para pestañas y sustituciones
+  const [activeTab, setActiveTab] = useState<'pendientes' | 'listos'>('pendientes')
+  const [completedOrders, setCompletedOrders] = useState<CompletedOrder[]>([])
+  const [substitutionNote, setSubstitutionNote] = useState('')
 
   const sorted = [...orders].sort((a, b) => remaining(a, now) - remaining(b, now))
-  const selected = orders.find((o) => o.id === selectedId) ?? sorted[0]
+  const selected = activeTab === 'pendientes' 
+    ? (orders.find((o) => o.id === selectedId) ?? sorted[0])
+    : completedOrders.find((o) => o.id === selectedId)
 
   const handleReady = (order: Order) => {
+    // Guardar en la lista de completados con su nota
+    const completedOrder: CompletedOrder = {
+      ...order,
+      substitutionNote: substitutionNote.trim()
+    }
+    setCompletedOrders(prev => [completedOrder, ...prev])
+    
+    // Limpiar la nota para el siguiente pedido
+    setSubstitutionNote('')
+
+    // Pasar al siguiente pedido
     const index = sorted.findIndex((o) => o.id === order.id)
     const next = sorted[index + 1] ?? sorted[index - 1]
     setSelectedId(next?.id ?? null)
     completeOrder(order.id)
   }
 
+  // Verifica si el pedido actual tiene algún producto por sustituir
+  const hasSubstitutions = selected?.items.some(item => item.substitute)
+
   return (
     <div className="grid h-full min-h-0 md:grid-cols-[minmax(260px,360px)_1fr]">
       <section aria-label="Cola de pedidos" className="flex min-h-0 flex-col border-border md:border-r">
-        <div className="flex items-center justify-between px-4 py-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-muted-foreground">Pendientes</h2>
-          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-bold">{orders.length}</span>
+        {/* Pestañas (Tabs) */}
+        <div className="flex border-b border-border">
+          <button
+            onClick={() => { setActiveTab('pendientes'); setSelectedId(null) }}
+            className={cn(
+              "flex-1 py-3 text-sm font-bold uppercase tracking-wide",
+              activeTab === 'pendientes' ? "border-b-2 border-primary text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Pendientes ({orders.length})
+          </button>
+          <button
+            onClick={() => { setActiveTab('listos'); setSelectedId(null) }}
+            className={cn(
+              "flex-1 py-3 text-sm font-bold uppercase tracking-wide",
+              activeTab === 'listos' ? "border-b-2 border-primary text-primary" : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Listos ({completedOrders.length})
+          </button>
         </div>
-        <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto px-3 pb-3 md:max-h-none md:flex-1">
-          {sorted.map((order) => {
-            const secs = remaining(order, now)
-            const active = selected?.id === order.id
-            return (
-              <li key={order.id}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(order.id)}
-                  aria-pressed={active}
-                  className={cn(
-                    'w-full rounded-xl border p-4 text-left transition-colors',
-                    active ? 'border-brand-yellow bg-brand-yellow/10' : 'border-border bg-card hover:bg-accent',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-black">{order.id}</span>
-                    <span className={cn('flex items-center gap-1 font-mono text-lg font-bold tabular-nums', timerTone(secs))}>
-                      <Timer className="size-4" aria-hidden="true" />
-                      {secs < 0 ? 'Vencido' : formatTime(secs)}
-                    </span>
-                  </div>
-                  <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
-                    <span>{order.customer}</span>
-                    <span>
-                      {order.items.reduce((n, i) => n + i.qty, 0)} items · {order.payment}
-                    </span>
-                  </div>
-                </button>
-              </li>
-            )
-          })}
-          {orders.length === 0 && (
-            <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
-              <Inbox className="size-10" aria-hidden="true" />
-              <p className="mt-2 font-semibold">No hay pedidos pendientes</p>
-              <p className="text-xs">Los nuevos pedidos aparecerán aquí.</p>
-            </li>
+
+        <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto px-3 py-3 md:max-h-none md:flex-1">
+          {activeTab === 'pendientes' ? (
+            <>
+              {sorted.map((order) => {
+                const secs = remaining(order, now)
+                const active = selected?.id === order.id
+                return (
+                  <li key={order.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(order.id)}
+                      aria-pressed={active}
+                      className={cn(
+                        'w-full rounded-xl border p-4 text-left transition-colors',
+                        active ? 'border-brand-yellow bg-brand-yellow/10' : 'border-border bg-card hover:bg-accent',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-black">{order.id}</span>
+                        <span className={cn('flex items-center gap-1 font-mono text-lg font-bold tabular-nums', timerTone(secs))}>
+                          <Timer className="size-4" aria-hidden="true" />
+                          {secs < 0 ? 'Vencido' : formatTime(secs)}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{order.customer}</span>
+                        <span>
+                          {order.items.reduce((n, i) => n + i.qty, 0)} items · {order.payment}
+                        </span>
+                      </div>
+                    </button>
+                  </li>
+                )
+              })}
+              {orders.length === 0 && (
+                <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
+                  <Inbox className="size-10" aria-hidden="true" />
+                  <p className="mt-2 font-semibold">No hay pedidos pendientes</p>
+                  <p className="text-xs">Los nuevos pedidos aparecerán aquí.</p>
+                </li>
+              )}
+            </>
+          ) : (
+            <>
+              {completedOrders.map((order) => {
+                const active = selected?.id === order.id
+                return (
+                  <li key={order.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(order.id)}
+                      aria-pressed={active}
+                      className={cn(
+                        'w-full rounded-xl border p-4 text-left transition-colors',
+                        active ? 'border-success bg-success/10' : 'border-border bg-card hover:bg-accent',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-black">{order.id}</span>
+                        <span className="flex items-center gap-1 text-sm font-bold text-success">
+                          <CheckCircle2 className="size-4" aria-hidden="true" />
+                          Listo
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{order.customer}</span>
+                        <span>{order.items.reduce((n, i) => n + i.qty, 0)} items</span>
+                      </div>
+                    </button>
+                  </li>
+                )
+              })}
+              {completedOrders.length === 0 && (
+                <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
+                  <CheckCircle2 className="size-10" aria-hidden="true" />
+                  <p className="mt-2 font-semibold">No hay pedidos listos aún</p>
+                </li>
+              )}
+            </>
           )}
         </ul>
       </section>
@@ -103,18 +188,23 @@ export function PedidosView() {
           <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold uppercase text-muted-foreground">Pedido activo</p>
+                <p className="text-xs font-bold uppercase text-muted-foreground">
+                  {activeTab === 'pendientes' ? 'Pedido activo' : 'Pedido completado'}
+                </p>
                 <h2 className="text-3xl font-black">{selected.id}</h2>
                 <p className="text-sm text-muted-foreground">
                   {selected.customer} · Pago con {selected.payment}
                 </p>
               </div>
-              <div className="rounded-xl bg-card px-4 py-3 text-right">
-                <p className="text-xs text-muted-foreground">Tiempo restante</p>
-                <p className={cn('font-mono text-3xl font-black tabular-nums', timerTone(remaining(selected, now)))}>
-                  {formatTime(remaining(selected, now))}
-                </p>
-              </div>
+              
+              {activeTab === 'pendientes' && (
+                <div className="rounded-xl bg-card px-4 py-3 text-right">
+                  <p className="text-xs text-muted-foreground">Tiempo restante</p>
+                  <p className={cn('font-mono text-3xl font-black tabular-nums', timerTone(remaining(selected, now)))}>
+                    {formatTime(remaining(selected, now))}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -124,7 +214,7 @@ export function PedidosView() {
                   Acepta sustitución
                 </span>
               )}
-              {validated[selected.id] && (
+              {(validated[selected.id] || activeTab === 'listos') && (
                 <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
                   <CheckCircle2 className="size-3.5" aria-hidden="true" />
                   QR validado
@@ -135,14 +225,18 @@ export function PedidosView() {
             <ul className="divide-y divide-border rounded-xl border border-border bg-card">
               {selected.items.map((item, i) => {
                 const key = `${selected.id}-${i}`
-                const done = picked[key]
+                const done = activeTab === 'listos' ? true : picked[key]
                 return (
                   <li key={key}>
                     <button
                       type="button"
-                      onClick={() => setPicked((p) => ({ ...p, [key]: !p[key] }))}
+                      onClick={() => activeTab === 'pendientes' && setPicked((p) => ({ ...p, [key]: !p[key] }))}
                       aria-pressed={done}
-                      className="flex w-full items-center gap-4 p-4 text-left hover:bg-accent"
+                      disabled={activeTab === 'listos'}
+                      className={cn(
+                        "flex w-full items-center gap-4 p-4 text-left",
+                        activeTab === 'pendientes' && "hover:bg-accent"
+                      )}
                     >
                       <span
                         className={cn(
@@ -152,7 +246,7 @@ export function PedidosView() {
                       >
                         {done && <Check className="size-4" aria-hidden="true" />}
                       </span>
-                      <span className={cn('flex-1 font-semibold', done && 'text-muted-foreground line-through')}>
+                      <span className={cn('flex-1 font-semibold', done && activeTab === 'pendientes' && 'text-muted-foreground line-through')}>
                         {item.name}
                         {item.substitute && (
                           <span className="ml-2 rounded-md bg-brand-yellow px-2 py-0.5 text-xs font-bold text-brand-yellow-foreground no-underline">
@@ -177,35 +271,71 @@ export function PedidosView() {
               </span>
             </div>
 
-            <div className="mt-auto grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setScannerOpen(true)}
-                className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95"
-              >
-                <QrCode className="size-6" aria-hidden="true" />
-                Escanear QR
-              </button>
-              <button
-                type="button"
-                onClick={() => handleReady(selected)}
-                className="flex h-16 items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95"
-              >
-                <CheckCircle2 className="size-6" aria-hidden="true" />
-                Marcar como Listo
-              </button>
-            </div>
+            {/* Panel de Sustitución */}
+            {hasSubstitutions && activeTab === 'pendientes' && (
+              <div className="rounded-xl border border-brand-yellow bg-brand-yellow/5 p-4">
+                <label htmlFor="substitution-note" className="flex items-center gap-2 text-sm font-bold text-brand-yellow mb-2">
+                  <Edit3 className="size-4" />
+                  Registro de Sustitución
+                </label>
+                <textarea
+                  id="substitution-note"
+                  placeholder="Ej: Se cambió Inka Chips 130g por Lays 150g..."
+                  value={substitutionNote}
+                  onChange={(e) => setSubstitutionNote(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-yellow min-h-[80px]"
+                />
+              </div>
+            )}
+
+            {activeTab === 'listos' && 'substitutionNote' in selected && selected.substitutionNote && (
+               <div className="rounded-xl border border-border bg-muted p-4">
+               <p className="text-sm font-bold text-muted-foreground mb-1">Nota de sustitución:</p>
+               <p className="text-sm">{selected.substitutionNote}</p>
+             </div>
+            )}
+
+            {activeTab === 'pendientes' && (
+              <div className="mt-auto grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setScannerOpen(true)}
+                  className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95"
+                >
+                  <QrCode className="size-6" aria-hidden="true" />
+                  Escanear QR
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleReady(selected)}
+                  className="flex h-16 items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95"
+                >
+                  <CheckCircle2 className="size-6" aria-hidden="true" />
+                  Marcar como Listo
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
-            <CheckCircle2 className="size-14 text-success" aria-hidden="true" />
-            <p className="mt-3 text-lg font-bold text-foreground">¡Todo al día!</p>
-            <p className="text-sm">No hay pedidos por preparar en este momento.</p>
+            {activeTab === 'pendientes' ? (
+              <>
+                <CheckCircle2 className="size-14 text-success" aria-hidden="true" />
+                <p className="mt-3 text-lg font-bold text-foreground">¡Todo al día!</p>
+                <p className="text-sm">No hay pedidos por preparar en este momento.</p>
+              </>
+            ) : (
+              <>
+                <Inbox className="size-14 text-muted-foreground/50" aria-hidden="true" />
+                <p className="mt-3 text-lg font-bold text-foreground">Historial vacío</p>
+                <p className="text-sm">Aquí aparecerán los pedidos que marques como listos.</p>
+              </>
+            )}
           </div>
         )}
       </section>
 
-      {scannerOpen && selected && (
+      {scannerOpen && selected && activeTab === 'pendientes' && (
         <QrScannerModal
           orderId={selected.id}
           onValidated={() => setValidated((v) => ({ ...v, [selected.id]: true }))}
