@@ -33,6 +33,18 @@ interface Account extends Customer {
 
 export interface CompletedOrder extends Order {
   substitutionNote?: string
+  readyAt?: string
+  deliveredAt?: string
+}
+
+export interface Complaint {
+  id: string
+  orderId: string
+  customer: string
+  email: string
+  type: 'Reembolso' | 'Queja de servicio' | 'Producto en mal estado' | 'Sugerencia'
+  detail: string
+  createdAt: string
 }
 
 export type AuthMode = 'login' | 'register'
@@ -69,8 +81,12 @@ interface StoreContextValue {
   setSede: (value: Sede) => void
   orders: Order[]
   completedOrders: CompletedOrder[]
+  deliveredOrders: CompletedOrder[]
+  complaints: Complaint[]
   readyCount: number
   completeOrder: (id: string, substitutionNote?: string) => void
+  deliverOrder: (id: string) => void
+  addComplaint: (data: Omit<Complaint, 'id' | 'createdAt'>) => void
   placeOrder: (payment: PaymentMethod, substitution: boolean) => PlaceOrderResult
   toast: string | null
   showToast: (message: string) => void
@@ -80,32 +96,40 @@ const StoreContext = createContext<StoreContextValue | null>(null)
 
 const MAX_QTY = 20
 
+const VALID_DOMAINS = [
+  'gmail.com',
+  'hotmail.com',
+  'outlook.com',
+  'outlook.es',
+  'icloud.com',
+  'yahoo.com',
+  'yahoo.es',
+  'unac.edu.pe',
+]
+
 const getLocalData = <T,>(key: string, defaultValue: T): T => {
   if (typeof window === 'undefined') return defaultValue
   try {
     const item = window.localStorage.getItem(key)
     return item ? JSON.parse(item) : defaultValue
-  } catch (error) {
+  } catch {
     return defaultValue
   }
 }
 
-const setLocalData = (key: string, value: any) => {
-  if (typeof window !== 'undefined') {
-    window.localStorage.setItem(key, JSON.stringify(value))
-  }
-}
-
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const [hydrated, setHydrated] = useState(false)
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS)
-  
+
   const [cartQty, setCartQty] = useState<Record<string, number>>({})
   const [sede, setSede] = useState<Sede>(SEDES[0])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [user, setUser] = useState<Customer | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
   const [completedOrders, setCompletedOrders] = useState<CompletedOrder[]>([])
-  
+  const [deliveredOrders, setDeliveredOrders] = useState<CompletedOrder[]>([])
+  const [complaints, setComplaints] = useState<Complaint[]>([])
+
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<'Todo' | Category>('Todo')
   const [readyCount, setReadyCount] = useState(0)
@@ -113,6 +137,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [authMode, setAuthMode] = useState<AuthMode | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // 1. Primero leemos toda la memoria guardada antes de permitir escrituras
   useEffect(() => {
     setCartQty(getLocalData('lacosmina_cart', {}))
     setSede(getLocalData('lacosmina_sede', SEDES[0]))
@@ -120,14 +145,43 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setUser(getLocalData('lacosmina_currentUser', null))
     setOrders(getLocalData('lacosmina_orders', INITIAL_ORDERS))
     setCompletedOrders(getLocalData('lacosmina_completed', []))
+    setDeliveredOrders(getLocalData('lacosmina_delivered', []))
+    setComplaints(getLocalData('lacosmina_complaints', []))
+    setHydrated(true)
   }, [])
 
-  useEffect(() => { setLocalData('lacosmina_cart', cartQty) }, [cartQty])
-  useEffect(() => { setLocalData('lacosmina_sede', sede) }, [sede])
-  useEffect(() => { setLocalData('lacosmina_accounts', accounts) }, [accounts])
-  useEffect(() => { setLocalData('lacosmina_currentUser', user) }, [user])
-  useEffect(() => { setLocalData('lacosmina_orders', orders) }, [orders])
-  useEffect(() => { setLocalData('lacosmina_completed', completedOrders) }, [completedOrders])
+  // 2. Solo guardamos cuando hydrated es true (evita que se borren al recargar)
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_cart', JSON.stringify(cartQty))
+  }, [cartQty, hydrated])
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_sede', JSON.stringify(sede))
+  }, [sede, hydrated])
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_accounts', JSON.stringify(accounts))
+  }, [accounts, hydrated])
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_currentUser', JSON.stringify(user))
+  }, [user, hydrated])
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_orders', JSON.stringify(orders))
+  }, [orders, hydrated])
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_completed', JSON.stringify(completedOrders))
+  }, [completedOrders, hydrated])
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_delivered', JSON.stringify(deliveredOrders))
+  }, [deliveredOrders, hydrated])
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_complaints', JSON.stringify(complaints))
+  }, [complaints, hydrated])
 
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -158,8 +212,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const register = useCallback(
     (data: Account) => {
       const email = data.email.trim().toLowerCase()
-      if (accounts.some((a) => a.email === email)) return 'Ya existe una cuenta con este correo. Inicia sesión.'
-      const account = { ...data, email, firstName: data.firstName.trim(), lastName: data.lastName.trim() }
+      const domain = email.split('@')[1]
+      if (!domain || !VALID_DOMAINS.includes(domain)) {
+        return 'Usa un proveedor de correo válido (@gmail.com, @hotmail.com, @outlook.com, @icloud.com, @unac.edu.pe).'
+      }
+      if (accounts.some((a) => a.email.trim().toLowerCase() === email)) {
+        return 'Ya existe una cuenta con este correo. Inicia sesión.'
+      }
+      const account: Account = {
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        email,
+        phone: data.phone.trim(),
+        password: data.password.trim(),
+      }
       setAccounts((prev) => [...prev, account])
       const { password: _password, ...customer } = account
       setUser(customer)
@@ -172,8 +238,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     (email: string, password: string) => {
       const cleanEmail = email.trim().toLowerCase()
       const cleanPassword = password.trim()
-      const account = accounts.find((a) => a.email === cleanEmail)
-      if (!account || account.password !== cleanPassword) return 'Correo o contraseña incorrectos.'
+      const account = accounts.find((a) => a.email.trim().toLowerCase() === cleanEmail)
+      if (!account) {
+        return 'No existe ninguna cuenta registrada con este correo. Regístrate primero.'
+      }
+      if (account.password.trim() !== cleanPassword) {
+        return 'Contraseña incorrecta.'
+      }
       const { password: _password, ...customer } = account
       setUser(customer)
       return null
@@ -223,14 +294,62 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const completeOrder = useCallback(
     (id: string, substitutionNote?: string) => {
       setOrders((prev) => {
-        const orderToComplete = prev.find(o => o.id === id)
+        const orderToComplete = prev.find((o) => o.id === id)
         if (orderToComplete) {
-          setCompletedOrders(cPrev => [{ ...orderToComplete, substitutionNote }, ...cPrev])
+          const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+          setCompletedOrders((cPrev) => [
+            { ...orderToComplete, substitutionNote, readyAt: nowStr },
+            ...cPrev.filter((item) => item.id !== id),
+          ])
         }
         return prev.filter((o) => o.id !== id)
       })
       setReadyCount((n) => n + 1)
-      showToast(`Pedido ${id} marcado como listo`)
+      showToast(`Pedido ${id} listo para recojo`)
+    },
+    [showToast],
+  )
+
+  const deliverOrder = useCallback(
+    (id: string) => {
+      setCompletedOrders((prev) => {
+        const orderToDeliver = prev.find((o) => o.id === id)
+        if (orderToDeliver) {
+          const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+          setDeliveredOrders((dPrev) => [
+            { ...orderToDeliver, deliveredAt: nowStr },
+            ...dPrev.filter((item) => item.id !== id),
+          ])
+        }
+        return prev.filter((o) => o.id !== id)
+      })
+      showToast(`Pedido ${id} entregado al cliente`)
+    },
+    [showToast],
+  )
+
+  const addComplaint = useCallback(
+    (data: Omit<Complaint, 'id' | 'createdAt'>) => {
+      const newComplaint: Complaint = {
+        ...data,
+        id: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
+        createdAt: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
+      }
+      setComplaints((prev) => [newComplaint, ...prev])
+      showToast('Reclamo registrado en el Libro de Reclamaciones')
+
+      // Si pidió reembolso, actualiza también la columna Reembolso en Google Sheets
+      if (data.orderId) {
+        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${encodeURIComponent(data.orderId)}`, {
+          method: 'PATCH',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            data: {
+              'Reembolso': `${data.type}: ${data.detail}`,
+            },
+          }),
+        }).catch(() => {})
+      }
     },
     [showToast],
   )
@@ -296,8 +415,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSede,
     orders,
     completedOrders,
+    deliveredOrders,
+    complaints,
     readyCount,
     completeOrder,
+    deliverOrder,
+    addComplaint,
     placeOrder,
     toast,
     showToast,
