@@ -31,6 +31,10 @@ interface Account extends Customer {
   password: string
 }
 
+export interface CompletedOrder extends Order {
+  substitutionNote?: string
+}
+
 export type AuthMode = 'login' | 'register'
 
 export type PlaceOrderResult =
@@ -64,8 +68,9 @@ interface StoreContextValue {
   sede: Sede
   setSede: (value: Sede) => void
   orders: Order[]
+  completedOrders: CompletedOrder[]
   readyCount: number
-  completeOrder: (id: string) => void
+  completeOrder: (id: string, substitutionNote?: string) => void
   placeOrder: (payment: PaymentMethod, substitution: boolean) => PlaceOrderResult
   toast: string | null
   showToast: (message: string) => void
@@ -99,6 +104,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [user, setUser] = useState<Customer | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
+  const [completedOrders, setCompletedOrders] = useState<CompletedOrder[]>([])
   
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<'Todo' | Category>('Todo')
@@ -113,6 +119,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setAccounts(getLocalData('lacosmina_accounts', []))
     setUser(getLocalData('lacosmina_currentUser', null))
     setOrders(getLocalData('lacosmina_orders', INITIAL_ORDERS))
+    setCompletedOrders(getLocalData('lacosmina_completed', []))
   }, [])
 
   useEffect(() => { setLocalData('lacosmina_cart', cartQty) }, [cartQty])
@@ -120,6 +127,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { setLocalData('lacosmina_accounts', accounts) }, [accounts])
   useEffect(() => { setLocalData('lacosmina_currentUser', user) }, [user])
   useEffect(() => { setLocalData('lacosmina_orders', orders) }, [orders])
+  useEffect(() => { setLocalData('lacosmina_completed', completedOrders) }, [completedOrders])
 
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -162,16 +170,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     (email: string, password: string) => {
-      // Limpiamos los espacios y forzamos minúsculas para evitar errores
       const cleanEmail = email.trim().toLowerCase()
       const cleanPassword = password.trim()
-      
       const account = accounts.find((a) => a.email === cleanEmail)
-      
-      if (!account || account.password !== cleanPassword) {
-        return 'Correo o contraseña incorrectos.'
-      }
-      
+      if (!account || account.password !== cleanPassword) return 'Correo o contraseña incorrectos.'
       const { password: _password, ...customer } = account
       setUser(customer)
       return null
@@ -219,8 +221,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const qtyInCart = useCallback((id: string) => cartQty[id] ?? 0, [cartQty])
 
   const completeOrder = useCallback(
-    (id: string) => {
-      setOrders((prev) => prev.filter((o) => o.id !== id))
+    (id: string, substitutionNote?: string) => {
+      setOrders((prev) => {
+        const orderToComplete = prev.find(o => o.id === id)
+        if (orderToComplete) {
+          setCompletedOrders(cPrev => [{ ...orderToComplete, substitutionNote }, ...cPrev])
+        }
+        return prev.filter((o) => o.id !== id)
+      })
       setReadyCount((n) => n + 1)
       showToast(`Pedido ${id} marcado como listo`)
     },
@@ -287,6 +295,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     sede,
     setSede,
     orders,
+    completedOrders,
     readyCount,
     completeOrder,
     placeOrder,
