@@ -1,5 +1,9 @@
-import { PedidosView } from '@/components/empleado/pedidos-view'
+import { AdminView } from '@/components/admin/admin-view'
 
-export default function Page() {
-  return <PedidosView />
+export const metadata = {
+  title: 'Centro de Operaciones | La Cosmina',
+}
+
+export default function AdminPage() {
+  return <AdminView />
 }
