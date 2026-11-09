@@ -47,13 +47,26 @@ export function CartPage() {
   }
 
   if (confirmed) {
+    // AQUÍ PONES TU NÚMERO POR MIENTRAS (Mantén el 51 al inicio)
+    const numeroBot = '51987654321' 
+    
+    // El sistema redacta todo el mensaje por el cliente automáticamente
+    const mensajeAutomatico = `Hola La Cosmina, acabo de realizar una compra en la web.
+ID del pedido: ${confirmed.orderId}
+A nombre de: ${confirmed.customer}
+Horario de recojo: ${confirmed.pickupTime}
+
+Solicito mi código de seguridad, por favor.`
+
+    const enlaceWhatsApp = `https://wa.me/${numeroBot}?text=${encodeURIComponent(mensajeAutomatico)}`
+
     return (
       <main className="mx-auto flex max-w-xl flex-col items-center px-4 py-16 text-center">
         <div className="flex size-24 items-center justify-center rounded-full bg-success/15">
           <CheckCircle2 className="size-12 text-success" aria-hidden="true" />
         </div>
         <h1 className="mt-6 text-3xl font-black">¡Gracias por tu compra, {confirmed.customer.split(' ')[0]}!</h1>
-        <p className="mt-2 text-muted-foreground">Te enviamos el comprobante a tu correo.</p>
+        <p className="mt-2 font-medium text-foreground">Tu pedido <span className="font-bold text-primary">{confirmed.orderId}</span> se registró exitosamente.</p>
         <dl className="mt-6 w-full space-y-2 rounded-2xl border border-border p-5 text-left text-sm">
           <Row label="N.° de pedido" value={confirmed.orderId} strong />
           <Row label="A nombre de" value={confirmed.customer} />
@@ -70,9 +83,21 @@ export function CartPage() {
             <dd className="font-black text-primary">{formatPrice(confirmed.total)}</dd>
           </div>
         </dl>
-        <Link href="/" className="mt-8 inline-flex h-12 items-center rounded-full bg-primary px-8 font-bold text-primary-foreground">
-          Seguir comprando
-        </Link>
+        
+        <div className="mt-8 flex flex-col gap-4 w-full px-4 sm:px-0">
+          <p className="text-sm font-bold text-muted-foreground">Último paso:</p>
+          <a 
+            href={enlaceWhatsApp}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-[#25D366] px-8 text-lg font-black text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
+          >
+            Recibir código por WhatsApp
+          </a>
+          <Link href="/" className="inline-flex h-12 w-full items-center justify-center rounded-xl border-2 border-border font-bold text-muted-foreground hover:border-primary hover:text-primary">
+            Volver a la tienda
+          </Link>
+        </div>
       </main>
     )
   }
