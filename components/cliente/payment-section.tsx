@@ -13,6 +13,21 @@ const METHODS: { value: PaymentMethod; icon: typeof CreditCard }[] = [
   { value: 'Plin', icon: Smartphone },
 ]
 
+const HORARIOS = [
+  '08:00 - 09:00',
+  '09:00 - 10:00',
+  '10:00 - 11:00',
+  '11:00 - 12:00',
+  '12:00 - 13:00',
+  '13:00 - 14:00',
+  '14:00 - 15:00',
+  '15:00 - 16:00',
+  '16:00 - 17:00',
+  '17:00 - 18:00',
+  '18:00 - 19:00',
+  '19:00 - 20:00',
+]
+
 export interface ConfirmedOrder {
   orderId: string
   customer: string
@@ -20,6 +35,8 @@ export interface ConfirmedOrder {
   substituted: number
   sede: Sede
   payment: PaymentMethod
+  pickupTime: string
+  phoneNumber: string
 }
 
 const inputClass =
@@ -31,6 +48,7 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
   const [substitution, setSubstitution] = useState(true)
   const [card, setCard] = useState({ number: '', expiry: '', cvv: '' })
   const [phone, setPhone] = useState('')
+  const [pickupTime, setPickupTime] = useState(HORARIOS[0])
   const [error, setError] = useState('')
 
   const formatCard = (v: string) =>
@@ -46,13 +64,17 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
 
   const handlePay = (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!/^9\d{8}$/.test(phone)) {
+      return setError('Ingresa un número de celular válido de 9 dígitos que empiece con 9.')
+    }
+
     if (method === 'Tarjeta') {
       if (card.number.replace(/\s/g, '').length !== 16) return setError('Ingresa un número de tarjeta válido de 16 dígitos.')
       if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(card.expiry)) return setError('Ingresa una fecha de vencimiento válida (MM/AA).')
       if (!/^\d{3,4}$/.test(card.cvv)) return setError('Ingresa un CVV válido.')
-    } else if (!/^9\d{8}$/.test(phone)) {
-      return setError('Ingresa un número de celular válido de 9 dígitos que empiece con 9.')
-    }
+    } 
+    
     setError('')
     const result = placeOrder(method, substitution)
     if (!result.ok) {
@@ -61,7 +83,14 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
         return setError('Hay productos agotados. Acepta la sustitución automática para poder pagar.')
       return setError('Tu carrito está vacío.')
     }
-    onPaid({ ...result, sede, payment: method })
+    
+    onPaid({ 
+      ...result, 
+      sede, 
+      payment: method, 
+      pickupTime, 
+      phoneNumber: phone 
+    })
   }
 
   if (!user) {
@@ -108,6 +137,45 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
           <p className="truncate font-bold">
             {user.firstName} {user.lastName}
           </p>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="horario" className="text-sm font-semibold">
+          Horario de Recojo
+        </label>
+        <select
+          id="horario"
+          value={pickupTime}
+          onChange={(e) => setPickupTime(e.target.value)}
+          className={inputClass}
+        >
+          {HORARIOS.map((hora) => (
+            <option key={hora} value={hora}>
+              {hora}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex w-full flex-col gap-1.5">
+        <label htmlFor="celular-general" className="text-sm font-semibold">
+          Número de celular
+        </label>
+        <div className="flex">
+          <span className="flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground">
+            +51
+          </span>
+          <input
+            id="celular-general"
+            type="tel"
+            inputMode="numeric"
+            autoComplete="tel-national"
+            placeholder="987 654 321"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 9))}
+            className={cn(inputClass, 'rounded-l-none')}
+          />
         </div>
       </div>
 
@@ -211,28 +279,8 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
                 <span className="text-xs font-semibold">QR de {method}</span>
               </div>
               <p className="text-center text-xs text-muted-foreground">
-                Escanea el código desde tu app {method} o ingresa tu número para recibir la solicitud de pago.
+                Escanea el código desde tu app {method} para realizar el pago.
               </p>
-              <div className="flex w-full flex-col gap-1.5">
-                <label htmlFor="celular" className="text-xs font-semibold">
-                  Número de celular {method}
-                </label>
-                <div className="flex">
-                  <span className="flex items-center rounded-l-lg border border-r-0 border-input bg-muted px-3 text-sm text-muted-foreground">
-                    +51
-                  </span>
-                  <input
-                    id="celular"
-                    type="tel"
-                    inputMode="numeric"
-                    autoComplete="tel-national"
-                    placeholder="987 654 321"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 9))}
-                    className={cn(inputClass, 'rounded-l-none')}
-                  />
-                </div>
-              </div>
             </div>
           )}
         </div>
@@ -264,4 +312,3 @@ export function PaymentSection({ onPaid }: { onPaid: (order: ConfirmedOrder) => 
     </form>
   )
 }
-
