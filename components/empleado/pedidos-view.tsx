@@ -148,7 +148,7 @@ export function PedidosView() {
                       <div className="flex items-center justify-between">
                         <span className="font-black">{order.id}</span>
                         <span className={cn('flex items-center gap-1 font-mono text-lg font-bold tabular-nums', timerTone(secs))}>
-                          <Timer className="size-4"/>
+                          <Timer className="size-4" />
                           {secs < 0 ? 'Vencido' : formatTime(secs)}
                         </span>
                       </div>
@@ -162,7 +162,7 @@ export function PedidosView() {
               })}
               {orders.length === 0 && (
                 <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
-                  <Inbox className="size-10"/>
+                  <Inbox className="size-10" />
                   <p className="mt-2 font-semibold">No hay pedidos pendientes</p>
                 </li>
               )}
@@ -199,7 +199,7 @@ export function PedidosView() {
               })}
               {completedOrders.length === 0 && (
                 <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
-                  <CheckCircle2 className="size-10"/>
+                  <CheckCircle2 className="size-10" />
                   <p className="mt-2 font-semibold">Ningún pedido esperando recojo</p>
                 </li>
               )}
@@ -223,7 +223,7 @@ export function PedidosView() {
                       <div className="flex items-center justify-between">
                         <span className="font-black">{order.id}</span>
                         <span className="flex items-center gap-1 text-xs font-bold text-success">
-                          <PackageCheck className="size-4"/>
+                          <PackageCheck className="size-4" />
                           Entregado {order.deliveredAt ?? ''}
                         </span>
                       </div>
@@ -237,7 +237,7 @@ export function PedidosView() {
               })}
               {deliveredOrders.length === 0 && (
                 <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
-                  <PackageCheck className="size-10"/>
+                  <PackageCheck className="size-10" />
                   <p className="mt-2 font-semibold">Aún no hay pedidos entregados</p>
                 </li>
               )}
@@ -262,7 +262,7 @@ export function PedidosView() {
               ))}
               {complaints.length === 0 && (
                 <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
-                  <ShieldAlert className="size-10"/>
+                  <ShieldAlert className="size-10" />
                   <p className="mt-2 font-semibold">Sin reclamos registrados</p>
                 </li>
               )}
@@ -277,7 +277,7 @@ export function PedidosView() {
           <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
             <div className="flex items-center justify-between rounded-xl border border-brand-yellow/40 bg-brand-yellow/10 p-4">
               <div className="flex items-center gap-3">
-                <Lock className="size-5 text-brand-yellow"/>
+                <Lock className="size-5 text-brand-yellow" />
                 <div>
                   <h2 className="text-sm font-black uppercase">Bandeja de Reclamos y Reembolsos (Solo Lectura)</h2>
                   <p className="text-xs text-muted-foreground">
@@ -289,7 +289,7 @@ export function PedidosView() {
 
             {complaints.length === 0 ? (
               <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                <CheckCircle2 className="size-12 text-success"/>
+                <CheckCircle2 className="size-12 text-success" />
                 <p className="mt-2 font-bold text-foreground">No existen quejas ni solicitudes de reembolso</p>
               </div>
             ) : (
@@ -346,13 +346,13 @@ export function PedidosView() {
             <div className="flex flex-wrap gap-2">
               {selected.substitution && (
                 <span className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-semibold">
-                  <RefreshCw className="size-3.5"/>
+                  <RefreshCw className="size-3.5" />
                   Acepta sustitución
                 </span>
               )}
               {(validated[selected.id] || activeTab === 'entregados') && (
                 <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
-                  <CheckCircle2 className="size-3.5"/>
+                  <CheckCircle2 className="size-3.5" />
                   QR validado
                 </span>
               )}
@@ -376,7 +376,7 @@ export function PedidosView() {
                           done ? 'border-success bg-success text-success-foreground' : 'border-muted-foreground/40',
                         )}
                       >
-                        {done && <Check className="size-4"/>}
+                        {done && <Check className="size-4" />}
                       </span>
                       <span className={cn('flex-1 font-semibold', done && activeTab === 'pendientes' && 'text-muted-foreground line-through')}>
                         {item.name}
@@ -406,7 +406,7 @@ export function PedidosView() {
             {hasSubstitutions && activeTab === 'pendientes' && (
               <div className="rounded-xl border border-brand-yellow bg-brand-yellow/5 p-4">
                 <label htmlFor="substitution-note" className="mb-2 flex items-center gap-2 text-sm font-bold text-brand-yellow">
-                  <Edit3 className="size-4"/>
+                  <Edit3 className="size-4" />
                   Especificar con qué producto se está sustituyendo
                 </label>
                 <textarea
@@ -433,7 +433,7 @@ export function PedidosView() {
                   onClick={() => handleReady(selected)}
                   className="flex h-16 w-full items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95"
                 >
-                  <CheckCircle2 className="size-6"/>
+                  <CheckCircle2 className="size-6" />
                   1. Marcar Pedido como Listo (Terminado de armar)
                 </button>
               </div>
@@ -446,7 +446,7 @@ export function PedidosView() {
                   onClick={() => setScannerOpen(true)}
                   className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95"
                 >
-                  <QrCode className="size-6"/>
+                  <QrCode className="size-6" />
                   Escanear QR del Cliente
                 </button>
                 <button
@@ -454,7 +454,7 @@ export function PedidosView() {
                   onClick={() => handleDeliver(selected.id)}
                   className="flex h-16 items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95"
                 >
-                  <PackageCheck className="size-6"/>
+                  <PackageCheck className="size-6" />
                   2. Confirmar Entrega al Cliente
                 </button>
               </div>
@@ -462,14 +462,16 @@ export function PedidosView() {
           </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
-            <Inbox className="size-12 opacity-40"/>
+            <Inbox className="size-12 opacity-40" />
             <p className="mt-3 text-lg font-bold text-foreground">Sin pedidos seleccionados</p>
           </div>
         )}
       </section>
 
       {scannerOpen && selected && (
-        <QrScannerModal onValidated="{()" orderId="{selected.id}"> setValidated((v) => ({ ...v, [selected.id]: true }))}
+        <QrScannerModal
+          orderId={selected.id}
+          onValidated={() => setValidated((v) => ({ ...v, [selected.id]: true }))}
           onClose={() => setScannerOpen(false)}
         />
       )}
@@ -505,18 +507,18 @@ function QrScannerModal({
 
   return (
     <div className="dark">
-      <Modal className="max-w-sm bg-card" onClose="{close}" open title="Escáner QR">
+      <Modal open onClose={close} title="Escáner QR" className="max-w-sm bg-card">
         <div className="flex flex-col items-center gap-4 p-6 pt-10">
           <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black">
             <div className="absolute inset-6 rounded-xl border-2 border-dashed border-white/20" />
             {status === 'scanning' ? (
               <>
-                <QrCode className="absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 text-white/25"/>
+                <QrCode className="absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 text-white/25" />
                 <span className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
               </>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-success/90 text-success-foreground">
-                <CheckCircle2 className="size-20"/>
+                <CheckCircle2 className="size-20" />
                 <p className="mt-2 text-2xl font-black">QR Validado</p>
               </div>
             )}
@@ -524,7 +526,7 @@ function QrScannerModal({
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
             {status === 'scanning' ? (
               <>
-                <ScanLine className="size-4 animate-pulse"/>
+                <ScanLine className="size-4 animate-pulse" />
                 Escaneando código del pedido {orderId}...
               </>
             ) : (
