@@ -201,3 +201,4 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
       <dd className={cn('text-right font-semibold', strong && 'font-black')}>{value}</dd>
     </div>
   )
+}
