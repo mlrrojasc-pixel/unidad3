@@ -98,8 +98,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [sede, setSede] = useState<Sede>(SEDES[0])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [user, setUser] = useState<Customer | null>(null)
-  
-  // AHORA LOS PEDIDOS PENDIENTES TAMBIÉN SE GUARDAN
   const [orders, setOrders] = useState<Order[]>([])
   
   const [search, setSearch] = useState('')
@@ -164,8 +162,16 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     (email: string, password: string) => {
-      const account = accounts.find((a) => a.email === email.trim().toLowerCase())
-      if (!account || account.password !== password) return 'Correo o contraseña incorrectos.'
+      // Limpiamos los espacios y forzamos minúsculas para evitar errores
+      const cleanEmail = email.trim().toLowerCase()
+      const cleanPassword = password.trim()
+      
+      const account = accounts.find((a) => a.email === cleanEmail)
+      
+      if (!account || account.password !== cleanPassword) {
+        return 'Correo o contraseña incorrectos.'
+      }
+      
       const { password: _password, ...customer } = account
       setUser(customer)
       return null
