@@ -11,8 +11,6 @@ import {
   Timer,
   Edit3,
   PackageCheck,
-  ShieldAlert,
-  Lock,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
@@ -43,10 +41,10 @@ function timerTone(seconds: number) {
   return 'text-success'
 }
 
-type EmployeeTab = 'pendientes' | 'listos' | 'entregados' | 'reclamos'
+type EmployeeTab = 'pendientes' | 'listos' | 'entregados'
 
 export function PedidosView() {
-  const { orders, completedOrders, deliveredOrders, complaints, completeOrder, deliverOrder } = useStore()
+  const { orders, completedOrders, deliveredOrders, completeOrder, deliverOrder } = useStore()
   const now = useNow()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -85,8 +83,8 @@ export function PedidosView() {
   return (
     <div className="grid h-full min-h-0 md:grid-cols-[minmax(300px,390px)_1fr]">
       <section aria-label="Cola de pedidos" className="flex min-h-0 flex-col border-border md:border-r">
-        {/* 4 Pestañas operativas */}
-        <div className="grid grid-cols-4 border-b border-border text-center">
+        {/* 3 Pestañas operativas */}
+        <div className="grid grid-cols-3 border-b border-border text-center">
           <button
             type="button"
             onClick={() => { setActiveTab('pendientes'); setSelectedId(null) }}
@@ -116,16 +114,6 @@ export function PedidosView() {
             )}
           >
             Entregados ({deliveredOrders.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => { setActiveTab('reclamos'); setSelectedId(null) }}
-            className={cn(
-              'py-3 text-[11px] font-bold uppercase tracking-tight',
-              activeTab === 'reclamos' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            Reclamos ({complaints.length})
           </button>
         </div>
 
@@ -243,80 +231,12 @@ export function PedidosView() {
               )}
             </>
           )}
-
-          {activeTab === 'reclamos' && (
-            <>
-              {complaints.map((c) => (
-                <li key={c.id} className="rounded-xl border border-border bg-card p-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-black text-primary">{c.id}</span>
-                    <span className="rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
-                      {c.type}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs font-semibold">
-                    Pedido: {c.orderId} · Cliente: {c.customer}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">{c.createdAt}</p>
-                </li>
-              ))}
-              {complaints.length === 0 && (
-                <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
-                  <ShieldAlert className="size-10" />
-                  <p className="mt-2 font-semibold">Sin reclamos registrados</p>
-                </li>
-              )}
-            </>
-          )}
         </ul>
       </section>
 
       {/* PANEL DERECHO */}
       <section aria-label="Detalle" className="flex min-h-0 flex-col overflow-y-auto border-t border-border md:border-t-0">
-        {activeTab === 'reclamos' ? (
-          <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
-            <div className="flex items-center justify-between rounded-xl border border-brand-yellow/40 bg-brand-yellow/10 p-4">
-              <div className="flex items-center gap-3">
-                <Lock className="size-5 text-brand-yellow" />
-                <div>
-                  <h2 className="text-sm font-black uppercase">Bandeja de Reclamos y Reembolsos (Solo Lectura)</h2>
-                  <p className="text-xs text-muted-foreground">
-                    El personal de primera línea solo puede visualizar los tickets. La resolución y extorno de dinero corresponde al Área de Atención al Cliente / Administración.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {complaints.length === 0 ? (
-              <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
-                <CheckCircle2 className="size-12 text-success" />
-                <p className="mt-2 font-bold text-foreground">No existen quejas ni solicitudes de reembolso</p>
-              </div>
-            ) : (
-              <ul className="space-y-3">
-                {complaints.map((c) => (
-                  <li key={c.id} className="rounded-xl border border-border bg-card p-5">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div>
-                        <span className="text-lg font-black">{c.id}</span>
-                        <span className="ml-2 text-sm text-muted-foreground">· Pedido afectado: <strong>{c.orderId}</strong></span>
-                      </div>
-                      <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
-                        {c.type}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Cliente: <strong>{c.customer}</strong> ({c.email}) · Fecha: {c.createdAt}
-                    </p>
-                    <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
-                      {c.detail}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ) : selected ? (
+        {selected ? (
           <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
