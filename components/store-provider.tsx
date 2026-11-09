@@ -75,7 +75,6 @@ const StoreContext = createContext<StoreContextValue | null>(null)
 
 const MAX_QTY = 20
 
-// Funciones auxiliares para Local Storage
 const getLocalData = <T,>(key: string, defaultValue: T): T => {
   if (typeof window === 'undefined') return defaultValue
   try {
@@ -95,44 +94,34 @@ const setLocalData = (key: string, value: any) => {
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [products, setProducts] = useState<Product[]>(INITIAL_PRODUCTS)
   
-  // Estados con Local Storage
   const [cartQty, setCartQty] = useState<Record<string, number>>({})
   const [sede, setSede] = useState<Sede>(SEDES[0])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [user, setUser] = useState<Customer | null>(null)
   
+  // AHORA LOS PEDIDOS PENDIENTES TAMBIÉN SE GUARDAN
+  const [orders, setOrders] = useState<Order[]>([])
+  
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<'Todo' | Category>('Todo')
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS)
   const [readyCount, setReadyCount] = useState(0)
   const [toast, setToast] = useState<string | null>(null)
   const [authMode, setAuthMode] = useState<AuthMode | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Cargar datos al montar el componente
   useEffect(() => {
     setCartQty(getLocalData('lacosmina_cart', {}))
     setSede(getLocalData('lacosmina_sede', SEDES[0]))
     setAccounts(getLocalData('lacosmina_accounts', []))
     setUser(getLocalData('lacosmina_currentUser', null))
+    setOrders(getLocalData('lacosmina_orders', INITIAL_ORDERS))
   }, [])
 
-  // Guardar datos cuando cambian
-  useEffect(() => {
-    setLocalData('lacosmina_cart', cartQty)
-  }, [cartQty])
-
-  useEffect(() => {
-    setLocalData('lacosmina_sede', sede)
-  }, [sede])
-
-  useEffect(() => {
-    setLocalData('lacosmina_accounts', accounts)
-  }, [accounts])
-
-  useEffect(() => {
-    setLocalData('lacosmina_currentUser', user)
-  }, [user])
+  useEffect(() => { setLocalData('lacosmina_cart', cartQty) }, [cartQty])
+  useEffect(() => { setLocalData('lacosmina_sede', sede) }, [sede])
+  useEffect(() => { setLocalData('lacosmina_accounts', accounts) }, [accounts])
+  useEffect(() => { setLocalData('lacosmina_currentUser', user) }, [user])
+  useEffect(() => { setLocalData('lacosmina_orders', orders) }, [orders])
 
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
