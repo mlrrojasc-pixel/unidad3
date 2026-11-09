@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { CheckCircle2, ImageIcon, Monitor, ShoppingBag, X } from 'lucide-react'
+import { CheckCircle2, ImageIcon, Monitor, ShoppingBag, Shield, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/components/store-provider'
 
@@ -112,11 +112,20 @@ export function Modal({
 
 export function ModeToggle({ dark = false }: { dark?: boolean }) {
   const pathname = usePathname()
-  const mode = pathname.startsWith('/empleado') ? 'empleado' : 'cliente'
+  
+  // Lógica actualizada para detectar las 3 rutas
+  const mode = pathname.startsWith('/admin')
+    ? 'admin'
+    : pathname.startsWith('/empleado')
+      ? 'empleado'
+      : 'cliente'
+      
   const options = [
     { value: 'cliente' as const, href: '/', label: 'Vista Cliente', icon: ShoppingBag },
     { value: 'empleado' as const, href: '/empleado', label: 'Vista Empleado', icon: Monitor },
+    { value: 'admin' as const, href: '/admin', label: 'Vista Admin', icon: Shield },
   ]
+
   return (
     <nav
       aria-label="Cambiar vista"
@@ -140,7 +149,9 @@ export function ModeToggle({ dark = false }: { dark?: boolean }) {
           >
             <Icon className="size-3.5" aria-hidden="true" />
             <span className="hidden sm:inline">{label}</span>
-            <span className="sm:hidden">{value === 'cliente' ? 'Cliente' : 'Empleado'}</span>
+            <span className="sm:hidden">
+              {value === 'cliente' ? 'Cliente' : value === 'empleado' ? 'Empleado' : 'Admin'}
+            </span>
           </Link>
         )
       })}
