@@ -20,7 +20,7 @@ export function CartPage() {
 
     // 2. Enviar los datos a tu Google Sheet (vía SheetDB)
     try {
-      await fetch('https://sheetdb.io/api/v1/TU_CODIGO_AQUI', {
+      await fetch('https://sheetdb.io/api/v1/5f2glnefammpr', {
         method: 'POST',
         headers: {
           'Accept': 'application/json',
