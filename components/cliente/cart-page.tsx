@@ -17,6 +17,8 @@ import {
   ShoppingBasket,
   Trash2,
   ImageIcon,
+  UserRound,
+  ShieldAlert,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, sedeShort } from '@/lib/store-data'
@@ -268,7 +270,7 @@ export function CartPage() {
 }
 
 function CustomerOrdersAndComplaints() {
-  const { user, orders, completedOrders, deliveredOrders, addComplaint, complaints } = useStore()
+  const { user, orders, completedOrders, deliveredOrders, addComplaint, complaints, openAuth } = useStore()
   const [complaintOrderId, setComplaintOrderId] = useState('')
   const [complaintType, setComplaintType] = useState<Complaint['type']>('Reembolso')
   const [complaintDetail, setComplaintDetail] = useState('')
@@ -282,9 +284,10 @@ function CustomerOrdersAndComplaints() {
     ...deliveredOrders.map((o) => ({ ...o, statusLabel: 'Entregado al cliente', statusTone: 'bg-primary/15 text-primary' })),
   ]
 
+  // Solo cargar los pedidos si el usuario inició sesión
   const myOrders = user
     ? allOrders.filter((o) => o.customer.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase())
-    : allOrders
+    : []
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -299,12 +302,12 @@ function CustomerOrdersAndComplaints() {
 
   const handleComplaintSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!complaintDetail.trim()) return
+    if (!complaintDetail.trim() || !user) return
     const targetOrder = complaintOrderId.trim() || myOrders[0]?.id || 'Sin ID'
     addComplaint({
       orderId: targetOrder,
-      customer: user ? `${user.firstName} ${user.lastName}` : 'Cliente Web',
-      email: user?.email ?? 'cliente@correo.com',
+      customer: `${user.firstName} ${user.lastName}`,
+      email: user.email,
       type: complaintType,
       detail: complaintDetail.trim(),
       image: complaintImage,
@@ -330,7 +333,12 @@ function CustomerOrdersAndComplaints() {
           Consulta en tiempo real si tu pedido está en preparación, listo en tienda o ya fue entregado.
         </p>
 
-        {myOrders.length === 0 ? (
+        {!user ? (
+          <div className="mt-6 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            <UserRound className="mx-auto size-8 opacity-50" />
+            <p className="mt-2 font-semibold">Inicia sesión para ver tus pedidos</p>
+          </div>
+        ) : myOrders.length === 0 ? (
           <div className="mt-6 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
             <Clock className="mx-auto size-8 opacity-50" />
             <p className="mt-2 font-semibold">Aún no tienes pedidos registrados</p>
@@ -376,92 +384,118 @@ function CustomerOrdersAndComplaints() {
           ¿Inconformidad con un producto? Solicita tu reembolso y adjunta evidencia fotográfica.
         </p>
 
-        <form onSubmit={handleComplaintSubmit} className="mt-4 space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
+        {!user ? (
+          <div className="mt-6 rounded-xl border border-border bg-muted/30 p-6 text-center">
+            <ShieldAlert className="mx-auto size-8 text-muted-foreground opacity-50" />
+            <p className="mt-3 text-sm font-bold text-foreground">Inicia sesión para presentar un reclamo</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Por normativa de seguridad, los reclamos y reembolsos deben estar asociados a la cuenta del titular.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => openAuth('login')}
+                className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-6 text-sm font-bold text-primary-foreground hover:opacity-90"
+              >
+                Iniciar sesión
+              </button>
+              <button
+                type="button"
+                onClick={() => openAuth('register')}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-border bg-background px-6 text-sm font-bold hover:border-primary hover:text-primary"
+              >
+                Crear cuenta
+              </button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleComplaintSubmit} className="mt-4 space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="text-xs font-bold">ID de Pedido</label>
+                <input
+                  type="text"
+                  placeholder={myOrders[0]?.id ?? 'Ej: LC-12345'}
+                  value={complaintOrderId}
+                  onChange={(e) => setComplaintOrderId(e.target.value)}
+                  className="mt-1 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-bold">Motivo</label>
+                <select
+                  value={complaintType}
+                  onChange={(e) => setComplaintType(e.target.value as Complaint['type'])}
+                  className="mt-1 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+                >
+                  <option value="Reembolso">Solicitar Reembolso</option>
+                  <option value="Producto en mal estado">Producto o sustitución incorrecta</option>
+                  <option value="Queja de servicio">Demora o atención en tienda</option>
+                  <option value="Sugerencia">Sugerencia de mejora</option>
+                </select>
+              </div>
+            </div>
+
             <div>
-              <label className="text-xs font-bold">ID de Pedido</label>
-              <input
-                type="text"
-                placeholder={myOrders[0]?.id ?? 'Ej: LC-12345'}
-                value={complaintOrderId}
-                onChange={(e) => setComplaintOrderId(e.target.value)}
-                className="mt-1 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              <label className="text-xs font-bold">Detalle del reclamo o reembolso</label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Describe el motivo de tu solicitud de reembolso o queja..."
+                value={complaintDetail}
+                onChange={(e) => setComplaintDetail(e.target.value)}
+                className="mt-1 w-full rounded-lg border border-input bg-background p-3 text-sm"
               />
             </div>
+
             <div>
-              <label className="text-xs font-bold">Motivo</label>
-              <select
-                value={complaintType}
-                onChange={(e) => setComplaintType(e.target.value as Complaint['type'])}
-                className="mt-1 h-10 w-full rounded-lg border border-input bg-background px-3 text-sm"
+              <label className="text-xs font-bold">Evidencia fotográfica (Opcional)</label>
+              <div className="mt-1 flex items-center gap-3">
+                <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 text-sm font-semibold hover:bg-muted/50">
+                  <ImageIcon className="size-4" />
+                  {complaintImage ? 'Cambiar foto' : 'Subir imagen'}
+                  <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+                </label>
+                {complaintImage && (
+                  <span className="text-xs font-bold text-success flex items-center gap-1">
+                    <CheckCircle2 className="size-3" /> Foto adjunta
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {sentSuccess && (
+              <p className="rounded-lg bg-success/15 px-3 py-2 text-xs font-bold text-success">
+                ✓ Tu solicitud y evidencia fueron enviadas al área de Administración.
+              </p>
+            )}
+
+            <div className="grid gap-2.5 pt-1 sm:grid-cols-2">
+              <button
+                type="submit"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground hover:opacity-90"
               >
-                <option value="Reembolso">Solicitar Reembolso</option>
-                <option value="Producto en mal estado">Producto o sustitución incorrecta</option>
-                <option value="Queja de servicio">Demora o atención en tienda</option>
-                <option value="Sugerencia">Sugerencia de mejora</option>
-              </select>
+                <BookOpen className="size-4" />
+                Enviar Reclamo en Web
+              </button>
+              <a
+                href={wspQuejaUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 text-sm font-bold text-white hover:opacity-90"
+              >
+                <MessageSquareWarning className="size-4" />
+                Reclamar por WhatsApp
+              </a>
             </div>
-          </div>
+          </form>
+        )}
 
-          <div>
-            <label className="text-xs font-bold">Detalle del reclamo o reembolso</label>
-            <textarea
-              required
-              rows={3}
-              placeholder="Describe el motivo de tu solicitud de reembolso o queja..."
-              value={complaintDetail}
-              onChange={(e) => setComplaintDetail(e.target.value)}
-              className="mt-1 w-full rounded-lg border border-input bg-background p-3 text-sm"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-bold">Evidencia fotográfica (Opcional)</label>
-            <div className="mt-1 flex items-center gap-3">
-              <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 text-sm font-semibold hover:bg-muted/50">
-                <ImageIcon className="size-4" />
-                {complaintImage ? 'Cambiar foto' : 'Subir imagen'}
-                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
-              </label>
-              {complaintImage && (
-                <span className="text-xs font-bold text-success flex items-center gap-1">
-                  <CheckCircle2 className="size-3" /> Foto adjunta
-                </span>
-              )}
-            </div>
-          </div>
-
-          {sentSuccess && (
-            <p className="rounded-lg bg-success/15 px-3 py-2 text-xs font-bold text-success">
-              ✓ Tu solicitud y evidencia fueron enviadas al área de Administración.
-            </p>
-          )}
-
-          <div className="grid gap-2.5 pt-1 sm:grid-cols-2">
-            <button
-              type="submit"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground hover:opacity-90"
-            >
-              <BookOpen className="size-4" />
-              Enviar Reclamo en Web
-            </button>
-            <a
-              href={wspQuejaUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 text-sm font-bold text-white hover:opacity-90"
-            >
-              <MessageSquareWarning className="size-4" />
-              Reclamar por WhatsApp
-            </a>
-          </div>
-        </form>
-
-        {complaints.length > 0 && (
+        {user && complaints.length > 0 && (
           <div className="mt-6 border-t border-border pt-5">
             <p className="text-xs font-bold uppercase text-muted-foreground">Estado de Mis Tickets</p>
             <ul className="mt-3 space-y-3">
-              {complaints.map((c) => (
+              {complaints.filter(c => c.customer.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase()).map((c) => (
                 <li key={c.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div>
