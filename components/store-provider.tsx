@@ -14,6 +14,9 @@ import {
 
 export type PaymentMethod = Order['payment']
 
+// NUEVO: Extendemos la orden para que guarde el horario
+export type AppOrder = Order & { pickupTime?: string }
+
 export interface CartLine {
   product: Product
   qty: number
@@ -31,7 +34,7 @@ interface Account extends Customer {
   password: string
 }
 
-export interface CompletedOrder extends Order {
+export interface CompletedOrder extends AppOrder {
   substitutionNote?: string
   readyAt?: string
   deliveredAt?: string
@@ -44,9 +47,9 @@ export interface Complaint {
   email: string
   type: 'Reembolso' | 'Queja de servicio' | 'Producto en mal estado' | 'Sugerencia'
   detail: string
-  image?: string // FOTO DE EVIDENCIA
-  resolutionStatus?: 'Aprobado' | 'Rechazado' // VEREDICTO ADMIN
-  resolutionText?: string // JUSTIFICACIÓN ADMIN
+  image?: string
+  resolutionStatus?: 'Aprobado' | 'Rechazado'
+  resolutionText?: string
   createdAt: string
 }
 
@@ -92,19 +95,19 @@ interface StoreContextValue {
   setCategory: (value: 'Todo' | Category) => void
   sede: Sede
   setSede: (value: Sede) => void
-  orders: Order[]
+  orders: AppOrder[]
   completedOrders: CompletedOrder[]
   deliveredOrders: CompletedOrder[]
   complaints: Complaint[]
-  tickets: SupportTicket[] // TICKETS DE EMPLEADO
+  tickets: SupportTicket[]
   readyCount: number
   completeOrder: (id: string, substitutionNote?: string) => void
   deliverOrder: (id: string) => void
   addComplaint: (data: Omit<Complaint, 'id' | 'createdAt'>) => void
-  resolveComplaint: (id: string, status: 'Aprobado' | 'Rechazado', text: string) => void // NUEVO
-  addTicket: (topic: string, detail: string, urgent: boolean) => void // NUEVO
-  resolveTicket: (id: string, status: 'En revisión' | 'Resuelto', text?: string) => void // NUEVO
-  placeOrder: (payment: PaymentMethod, substitution: boolean) => PlaceOrderResult
+  resolveComplaint: (id: string, status: 'Aprobado' | 'Rechazado', text: string) => void
+  addTicket: (topic: string, detail: string, urgent: boolean) => void
+  resolveTicket: (id: string, status: 'En revisión' | 'Resuelto', text?: string) => void
+  placeOrder: (payment: PaymentMethod, substitution: boolean, pickupTime: string) => PlaceOrderResult // ACTUALIZADO
   toast: string | null
   showToast: (message: string) => void
 }
@@ -142,7 +145,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [sede, setSede] = useState<Sede>(SEDES[0])
   const [accounts, setAccounts] = useState<Account[]>([])
   const [user, setUser] = useState<Customer | null>(null)
-  const [orders, setOrders] = useState<Order[]>([])
+  const [orders, setOrders] = useState<AppOrder[]>([])
   const [completedOrders, setCompletedOrders] = useState<CompletedOrder[]>([])
   const [deliveredOrders, setDeliveredOrders] = useState<CompletedOrder[]>([])
   const [complaints, setComplaints] = useState<Complaint[]>([])
@@ -160,7 +163,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setSede(getLocalData('lacosmina_sede', SEDES[0]))
     setAccounts(getLocalData('lacosmina_accounts', []))
     setUser(getLocalData('lacosmina_currentUser', null))
-    setOrders(getLocalData('lacosmina_orders', INITIAL_ORDERS))
+    setOrders(getLocalData('lacosmina_orders', INITIAL_ORDERS as AppOrder[]))
     setCompletedOrders(getLocalData('lacosmina_completed', []))
     setDeliveredOrders(getLocalData('lacosmina_delivered', []))
     setComplaints(getLocalData('lacosmina_complaints', []))
@@ -390,7 +393,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [showToast])
 
   const placeOrder = useCallback(
-    (payment: PaymentMethod, substitution: boolean): PlaceOrderResult => {
+    (payment: PaymentMethod, substitution: boolean, pickupTime: string): PlaceOrderResult => {
       if (!user) return { ok: false, reason: 'auth' }
       if (cart.length === 0) return { ok: false, reason: 'empty' }
       const substituted = cart.filter((l) => !l.available).length
@@ -405,6 +408,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           customer,
           sede,
           payment,
+          pickupTime, // AQUI GUARDAMOS EL HORARIO
           slaSeconds,
           deadline: Date.now() + slaSeconds * 1000,
           substitution,
