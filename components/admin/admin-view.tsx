@@ -15,14 +15,13 @@ import {
   PackageCheck,
   RefreshCw,
   Search,
-  MessageSquare,
-  AlertTriangle
+  AlertTriangle,
+  Wallet
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/components/store-provider'
 import { ModeToggle, Modal } from '@/components/shared'
 import { formatPrice } from '@/lib/store-data'
-import Image from 'next/image'
 
 type AdminTab = 'kpis' | 'reclamos' | 'soporte' | 'clientes'
 
@@ -30,23 +29,31 @@ export function AdminView() {
   const { orders, completedOrders, deliveredOrders, complaints, tickets, resolveComplaint, resolveTicket, sede } = useStore()
   const [activeTab, setActiveTab] = useState<AdminTab>('kpis')
   
-  // Estados para justificaciones
   const [replyTexts, setReplyTexts] = useState<Record<string, string>>({})
   const [ticketReplies, setTicketReplies] = useState<Record<string, string>>({})
-  
-  // Estado para el visor de imágenes
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
 
-  // Cálculos rápidos para KPIs
+  // CALCULOS Y MÉTRICAS DINÁMICAS (Cosa 6)
   const allOrders = [...orders, ...completedOrders, ...deliveredOrders]
+  const totalOrders = allOrders.length || 1
   const totalSales = deliveredOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.qty, 0), 0)
-  const substitutionRate = allOrders.length > 0 
-    ? Math.round((allOrders.filter(o => o.substitution).length / allOrders.length) * 100) 
+  
+  const substitutionRate = Math.round((allOrders.filter(o => o.substitution).length / totalOrders) * 100)
+  const refundRate = Math.round((complaints.filter(c => c.type === 'Reembolso').length / totalOrders) * 100)
+  
+  // Tiempos dinámicos calculados por volumen de items para que se muevan conforme avanzas
+  const avgItemsPerOrder = deliveredOrders.length > 0 
+    ? deliveredOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.qty, 0), 0) / deliveredOrders.length 
     : 0
+  
+  const packTimeMins = deliveredOrders.length > 0 ? Math.max(2, Math.round(avgItemsPerOrder * 1.5)) : 0
+  const deliveryTimeMins = deliveredOrders.length > 0 ? Math.max(1, Math.round(avgItemsPerOrder * 0.8)) : 0
+  
+  const avgPackStr = deliveredOrders.length > 0 ? `0${packTimeMins}:45 min` : "00:00 min"
+  const avgDelivStr = deliveredOrders.length > 0 ? `0${deliveryTimeMins}:20 min` : "00:00 min"
 
   const uniqueCustomers = Array.from(new Set(allOrders.map(o => o.customer)))
   
-  // Contadores para notificaciones
   const pendingComplaints = complaints.filter(c => !c.resolutionStatus).length
   const pendingTickets = tickets.filter(t => t.status !== 'Resuelto').length
 
@@ -63,7 +70,6 @@ export function AdminView() {
 
   return (
     <div className="dark flex h-dvh flex-col bg-background text-foreground md:flex-row">
-      {/* Menú Lateral Admin */}
       <aside className="flex shrink-0 border-sidebar-border bg-[#0a0a0a] md:w-64 md:flex-col md:border-r">
         <div className="hidden items-center gap-3 px-6 py-6 md:flex">
           <span className="flex size-10 items-center justify-center rounded-xl bg-primary text-xl font-black text-brand-yellow">
@@ -109,14 +115,15 @@ export function AdminView() {
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8">
-          {/* 1. DASHBOARD KPIs */}
+          {/* 1. DASHBOARD KPIs (AHORA CON 5 TARJETAS) */}
           {activeTab === 'kpis' && (
             <div className="space-y-6 animate-in fade-in">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <MetricCard icon={TrendingUp} title="Ingresos Totales (Entregados)" value={formatPrice(totalSales)} trend="+12.5%" />
-                <MetricCard icon={Clock} title="T. Promedio Empaquetado" value="08:45 min" />
-                <MetricCard icon={PackageCheck} title="T. Promedio Entrega" value="03:20 min" />
-                <MetricCard icon={RefreshCw} title="Tasa de Sustituciones" value={`${substitutionRate}%`} trend={substitutionRate > 20 ? 'Alto' : 'Normal'} />
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                <MetricCard icon={TrendingUp} title="Ingresos" value={formatPrice(totalSales)} trend="+12.5%" />
+                <MetricCard icon={Clock} title="Empaquetado" value={avgPackStr} />
+                <MetricCard icon={PackageCheck} title="T. Entrega" value={avgDelivStr} />
+                <MetricCard icon={RefreshCw} title="Sustituciones" value={`${substitutionRate}%`} trend={substitutionRate > 20 ? 'Alto' : 'Normal'} />
+                <MetricCard icon={Wallet} title="Reembolsos" value={`${refundRate}%`} trend={refundRate > 10 ? 'Atención' : 'Óptimo'} />
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
                 <h3 className="mb-4 text-sm font-bold text-muted-foreground">Flujo del embudo de hoy</h3>
@@ -196,12 +203,12 @@ export function AdminView() {
                         ) : (
                           <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
                             <label className="text-xs font-bold text-brand-yellow flex items-center gap-1.5">
-                              <ShieldAlert className="size-4" /> Resolución requerida (Visible para Cliente/Empleado)
+                              <ShieldAlert className="size-4" /> Resolución (Actualizará Excel y Visor Web)
                             </label>
                             <textarea 
                               value={replyTexts[c.id] || ''}
                               onChange={(e) => setReplyTexts(prev => ({ ...prev, [c.id]: e.target.value }))}
-                              placeholder="Ej: Tras revisar la evidencia, se procederá con el extorno de S/ 25.00 a la cuenta original. Disculpe los inconvenientes."
+                              placeholder="Ej: Tras revisar la evidencia, se procederá con el extorno de S/ 25.00 a la cuenta original..."
                               className="w-full rounded-xl border border-white/10 bg-black/60 p-4 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-muted-foreground/50 transition-colors"
                               rows={3}
                             />
@@ -210,7 +217,7 @@ export function AdminView() {
                                 <CheckCircle2 className="size-4" /> Aprobar Reembolso
                               </button>
                               <button onClick={() => handleResolveComplaint(c.id, 'Rechazado')} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/20 bg-transparent py-3.5 text-sm font-bold text-white hover:bg-white/10 active:scale-95 transition-all">
-                                <XCircle className="size-4" /> Rechazar Reclamo
+                                <XCircle className="size-4" /> Rechazar
                               </button>
                             </div>
                           </div>
@@ -350,7 +357,6 @@ export function AdminView() {
         <div className="p-4 flex flex-col items-center">
           {selectedImage && (
             <div className="relative w-full h-[60vh] rounded-xl overflow-hidden bg-black/50 border border-white/10">
-              {/* Usamos un tag img normal para Base64 para evitar errores de dominios de Next.js */}
               <img 
                 src={selectedImage} 
                 alt="Evidencia adjunta" 
@@ -370,7 +376,6 @@ export function AdminView() {
   )
 }
 
-// Subcomponentes visuales
 function TabButton({ active, onClick, icon: Icon, label, badge }: any) {
   return (
     <button
@@ -396,11 +401,11 @@ function MetricCard({ icon: Icon, title, value, trend }: any) {
     <div className="rounded-2xl border border-white/10 bg-[#141419] p-5 shadow-lg transition-transform hover:-translate-y-1">
       <div className="flex items-center gap-3 text-muted-foreground">
         <div className="p-2 rounded-lg bg-white/5"><Icon className="size-4 text-white" /></div>
-        <h3 className="text-xs font-bold uppercase tracking-wider">{title}</h3>
+        <h3 className="text-[10px] font-bold uppercase tracking-wider">{title}</h3>
       </div>
       <div className="mt-5 flex items-end justify-between">
-        <p className="text-3xl font-black text-white">{value}</p>
-        {trend && <span className={cn("text-xs font-black uppercase px-2 py-1 rounded-md", trend.includes('+') ? 'bg-success/20 text-success' : 'bg-brand-yellow/20 text-brand-yellow')}>{trend}</span>}
+        <p className="text-2xl font-black text-white">{value}</p>
+        {trend && <span className={cn("text-[10px] font-black uppercase px-2 py-1 rounded-md", trend.includes('+') || trend === 'Óptimo' || trend === 'Normal' ? 'bg-success/20 text-success' : 'bg-brand-yellow/20 text-brand-yellow')}>{trend}</span>}
       </div>
     </div>
   )
