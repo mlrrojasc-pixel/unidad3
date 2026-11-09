@@ -16,6 +16,7 @@ import {
   Plus,
   ShoppingBasket,
   Trash2,
+  ImageIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, sedeShort } from '@/lib/store-data'
@@ -271,6 +272,7 @@ function CustomerOrdersAndComplaints() {
   const [complaintOrderId, setComplaintOrderId] = useState('')
   const [complaintType, setComplaintType] = useState<Complaint['type']>('Reembolso')
   const [complaintDetail, setComplaintDetail] = useState('')
+  const [complaintImage, setComplaintImage] = useState<string>('')
   const [sentSuccess, setSentSuccess] = useState(false)
 
   // Unimos todos los pedidos con su estado actual
@@ -284,6 +286,17 @@ function CustomerOrdersAndComplaints() {
     ? allOrders.filter((o) => o.customer.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase())
     : allOrders
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        setComplaintImage(reader.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
   const handleComplaintSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!complaintDetail.trim()) return
@@ -294,8 +307,10 @@ function CustomerOrdersAndComplaints() {
       email: user?.email ?? 'cliente@correo.com',
       type: complaintType,
       detail: complaintDetail.trim(),
+      image: complaintImage,
     })
     setComplaintDetail('')
+    setComplaintImage('')
     setSentSuccess(true)
     setTimeout(() => setSentSuccess(false), 4000)
   }
@@ -358,10 +373,10 @@ function CustomerOrdersAndComplaints() {
           <h2 className="text-xl font-black">Libro de Reclamaciones y Reembolsos</h2>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          ¿Inconformidad con un producto o sustitución? Solicita tu reembolso por la web o vía WhatsApp.
+          ¿Inconformidad con un producto? Solicita tu reembolso y adjunta evidencia fotográfica.
         </p>
 
-        <form onSubmit={handleComplaintSubmit} className="mt-4 space-y-3">
+        <form onSubmit={handleComplaintSubmit} className="mt-4 space-y-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs font-bold">ID de Pedido</label>
@@ -400,9 +415,25 @@ function CustomerOrdersAndComplaints() {
             />
           </div>
 
+          <div>
+            <label className="text-xs font-bold">Evidencia fotográfica (Opcional)</label>
+            <div className="mt-1 flex items-center gap-3">
+              <label className="flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 text-sm font-semibold hover:bg-muted/50">
+                <ImageIcon className="size-4" />
+                {complaintImage ? 'Cambiar foto' : 'Subir imagen'}
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              </label>
+              {complaintImage && (
+                <span className="text-xs font-bold text-success flex items-center gap-1">
+                  <CheckCircle2 className="size-3" /> Foto adjunta
+                </span>
+              )}
+            </div>
+          </div>
+
           {sentSuccess && (
             <p className="rounded-lg bg-success/15 px-3 py-2 text-xs font-bold text-success">
-              ✓ Tu solicitud fue enviada al área de Atención al Cliente y registrada en el sistema.
+              ✓ Tu solicitud y evidencia fueron enviadas al área de Administración.
             </p>
           )}
 
@@ -427,12 +458,30 @@ function CustomerOrdersAndComplaints() {
         </form>
 
         {complaints.length > 0 && (
-          <div className="mt-5 border-t border-border pt-4">
-            <p className="text-xs font-bold uppercase text-muted-foreground">Últimos tickets registrados ({complaints.length})</p>
-            <ul className="mt-2 space-y-2 text-xs">
-              {complaints.slice(0, 2).map((c) => (
-                <li key={c.id} className="rounded-lg bg-muted p-2.5">
-                  <span className="font-bold text-primary">{c.id}</span> · Pedido <strong>{c.orderId}</strong> ({c.type}): {c.detail}
+          <div className="mt-6 border-t border-border pt-5">
+            <p className="text-xs font-bold uppercase text-muted-foreground">Estado de Mis Tickets</p>
+            <ul className="mt-3 space-y-3">
+              {complaints.map((c) => (
+                <li key={c.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="font-black text-primary">{c.id}</span> · Pedido <strong>{c.orderId}</strong>
+                    </div>
+                    <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
+                      {c.type}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-sm">{c.detail}</p>
+                  
+                  {/* Respuesta del Administrador visible para el cliente */}
+                  {c.resolutionStatus && (
+                    <div className={cn("mt-3 rounded-lg border p-3 text-xs", c.resolutionStatus === 'Aprobado' ? 'border-success/30 bg-success/10 text-success-foreground' : 'border-destructive/30 bg-destructive/10 text-destructive-foreground')}>
+                      <p className={cn("font-black uppercase", c.resolutionStatus === 'Aprobado' ? 'text-success' : 'text-destructive')}>
+                        {c.resolutionStatus === 'Aprobado' ? 'Reembolso Aprobado' : 'Reclamo Rechazado'}
+                      </p>
+                      <p className="mt-1 font-medium">{c.resolutionText}</p>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
