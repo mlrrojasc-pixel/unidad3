@@ -30,9 +30,9 @@ export function CartPage() {
             {
               'ID de Pedido': orden.orderId,
               'Cliente': orden.customer,
-              'Celular': 'Por registrar', 
+              'Celular': orden.phoneNumber, 
               'Horario de Recojo': orden.pickupTime,
-              'Estado': 'Pendiente',
+              'Estado': 'Compra confirmada',
               'Sustitución': orden.substituted > 0 ? 'Aprobada' : 'Ninguna',
               'Reembolso': '-',
               'Calificación 1-5': '',
