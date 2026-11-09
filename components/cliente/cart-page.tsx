@@ -13,6 +13,34 @@ export function CartPage() {
   const { cart, cartCount, cartTotal, updateQty, clearCart, sede, unavailableCount } = useStore()
   const [confirmed, setConfirmed] = useState<ConfirmedOrder | null>(null)
 
+  // NUEVA FUNCIÓN PARA ENVIAR AL EXCEL
+  const procesarYGuardarPedido = async (orden: ConfirmedOrder) => {
+    // 1. Mostrar la pantalla de éxito en la web
+    setConfirmed(orden)
+
+    // 2. Enviar los datos a tu Google Sheet (vía SheetDB)
+    try {
+      await fetch('https://sheetdb.io/api/v1/TU_CODIGO_AQUI', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          data: [
+            {
+              'ID de Pedido': orden.orderId,
+              'Cliente': orden.customer,
+              'Estado': 'Pendiente'
+            }
+          ]
+        })
+      })
+    } catch (error) {
+      console.error('Error al conectar con Excel', error)
+    }
+  }
+
   if (confirmed) {
     return (
       <main className="mx-auto flex max-w-xl flex-col items-center px-4 py-16 text-center">
@@ -186,7 +214,7 @@ export function CartPage() {
                 <dd className="font-black text-primary">{formatPrice(cartTotal)}</dd>
               </div>
             </dl>
-            <PaymentSection onPaid={setConfirmed} />
+            <PaymentSection onPaid={procesarYGuardarPedido} />
           </div>
         </aside>
       </div>
