@@ -31,7 +31,6 @@ function timerTone(seconds: number) {
   return 'text-success'
 }
 
-// Interfaz extendida para guardar la nota de sustitución
 interface CompletedOrder extends Order {
   substitutionNote?: string
 }
@@ -44,10 +43,26 @@ export function PedidosView() {
   const [validated, setValidated] = useState<Record<string, boolean>>({})
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   
-  // Nuevos estados para pestañas y sustituciones
   const [activeTab, setActiveTab] = useState<'pendientes' | 'listos'>('pendientes')
   const [completedOrders, setCompletedOrders] = useState<CompletedOrder[]>([])
   const [substitutionNote, setSubstitutionNote] = useState('')
+
+  // Cargar historial de listos al iniciar
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = window.localStorage.getItem('lacosmina_completed_orders')
+      if (saved) {
+        try { setCompletedOrders(JSON.parse(saved)) } catch (e) {}
+      }
+    }
+  }, [])
+
+  // Guardar historial de listos en memoria
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('lacosmina_completed_orders', JSON.stringify(completedOrders))
+    }
+  }, [completedOrders])
 
   const sorted = [...orders].sort((a, b) => remaining(a, now) - remaining(b, now))
   const selected = activeTab === 'pendientes' 
@@ -55,30 +70,24 @@ export function PedidosView() {
     : completedOrders.find((o) => o.id === selectedId)
 
   const handleReady = (order: Order) => {
-    // Guardar en la lista de completados con su nota
     const completedOrder: CompletedOrder = {
       ...order,
       substitutionNote: substitutionNote.trim()
     }
     setCompletedOrders(prev => [completedOrder, ...prev])
-    
-    // Limpiar la nota para el siguiente pedido
     setSubstitutionNote('')
 
-    // Pasar al siguiente pedido
     const index = sorted.findIndex((o) => o.id === order.id)
     const next = sorted[index + 1] ?? sorted[index - 1]
     setSelectedId(next?.id ?? null)
     completeOrder(order.id)
   }
 
-  // Verifica si el pedido actual tiene algún producto por sustituir
   const hasSubstitutions = selected?.items.some(item => item.substitute)
 
   return (
     <div className="grid h-full min-h-0 md:grid-cols-[minmax(260px,360px)_1fr]">
       <section aria-label="Cola de pedidos" className="flex min-h-0 flex-col border-border md:border-r">
-        {/* Pestañas (Tabs) */}
         <div className="flex border-b border-border">
           <button
             onClick={() => { setActiveTab('pendientes'); setSelectedId(null) }}
@@ -271,7 +280,6 @@ export function PedidosView() {
               </span>
             </div>
 
-            {/* Panel de Sustitución */}
             {hasSubstitutions && activeTab === 'pendientes' && (
               <div className="rounded-xl border border-brand-yellow bg-brand-yellow/5 p-4">
                 <label htmlFor="substitution-note" className="flex items-center gap-2 text-sm font-bold text-brand-yellow mb-2">
@@ -280,7 +288,7 @@ export function PedidosView() {
                 </label>
                 <textarea
                   id="substitution-note"
-                  placeholder="Ej: Se cambió Inka Chips 130g por Lays 150g..."
+                  placeholder="Ej: Se cambió Inka Chips por Lays..."
                   value={substitutionNote}
                   onChange={(e) => setSubstitutionNote(e.target.value)}
                   className="w-full rounded-lg border border-input bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-yellow min-h-[80px]"
