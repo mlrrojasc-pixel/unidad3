@@ -11,11 +11,15 @@ import {
   Timer,
   Edit3,
   PackageCheck,
+  AlertTriangle, // NUEVO
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
 import { useStore } from '@/components/store-provider'
 import { Modal } from '@/components/shared'
+
+// Hacemos que reconozca el pickupTime
+type AppOrder = Order & { pickupTime?: string }
 
 function useNow() {
   const [now, setNow] = useState(() => Date.now())
@@ -54,9 +58,16 @@ export function PedidosView() {
   const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
   const [substitutionNote, setSubstitutionNote] = useState('')
 
-  const sorted = [...orders].sort((a, b) => remaining(a, now) - remaining(b, now))
+  // NUEVO: Ordena dando prioridad a los urgentes
+  const sorted = [...(orders as AppOrder[])].sort((a, b) => {
+    const aUrgent = a.pickupTime === 'Lo antes posible (30 min)'
+    const bUrgent = b.pickupTime === 'Lo antes posible (30 min)'
+    if (aUrgent && !bUrgent) return -1
+    if (!aUrgent && bUrgent) return 1
+    return remaining(a, now) - remaining(b, now)
+  })
 
-  const selected =
+  const selected = (
     activeTab === 'pendientes'
       ? (orders.find((o) => o.id === selectedId) ?? sorted[0])
       : activeTab === 'listos'
@@ -64,6 +75,7 @@ export function PedidosView() {
         : activeTab === 'entregados'
           ? (deliveredOrders.find((o) => o.id === selectedId) ?? deliveredOrders[0])
           : null
+  ) as AppOrder | null
 
   const handleReady = (order: Order) => {
     completeOrder(order.id, substitutionNote.trim())
@@ -123,6 +135,8 @@ export function PedidosView() {
               {sorted.map((order) => {
                 const secs = remaining(order, now)
                 const active = selected?.id === order.id
+                const isUrgent = order.pickupTime === 'Lo antes posible (30 min)'
+
                 return (
                   <li key={order.id}>
                     <button
@@ -130,17 +144,27 @@ export function PedidosView() {
                       onClick={() => setSelectedId(order.id)}
                       className={cn(
                         'w-full rounded-xl border p-4 text-left transition-colors',
-                        active ? 'border-brand-yellow bg-brand-yellow/10' : 'border-border bg-card hover:bg-accent',
+                        active 
+                          ? isUrgent ? 'border-destructive bg-destructive/10' : 'border-brand-yellow bg-brand-yellow/10' 
+                          : 'border-border bg-card hover:bg-accent',
                       )}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-black">{order.id}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-black">{order.id}</span>
+                          {/* ETIQUETA ROJA DE URGENTE */}
+                          {isUrgent && (
+                            <span className="flex items-center gap-1 rounded-md bg-destructive/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-destructive">
+                              <AlertTriangle className="size-3" /> Urgente
+                            </span>
+                          )}
+                        </div>
                         <span className={cn('flex items-center gap-1 font-mono text-lg font-bold tabular-nums', timerTone(secs))}>
                           <Timer className="size-4" />
                           {secs < 0 ? 'Vencido' : formatTime(secs)}
                         </span>
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
+                      <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
                         <span>{order.customer}</span>
                         <span>{order.items.reduce((n, i) => n + i.qty, 0)} items · {order.payment}</span>
                       </div>
@@ -247,9 +271,16 @@ export function PedidosView() {
                       ? '2. Listo en estante (Esperando al cliente)'
                       : '3. Pedido entregado'}
                 </p>
-                <h2 className="text-3xl font-black">{selected.id}</h2>
-                <p className="text-sm text-muted-foreground">
-                  {selected.customer} · Pago con {selected.payment}
+                <div className="flex items-center gap-3">
+                  <h2 className="text-3xl font-black">{selected.id}</h2>
+                  {selected.pickupTime === 'Lo antes posible (30 min)' && activeTab === 'pendientes' && (
+                    <span className="flex items-center gap-1.5 rounded-lg bg-destructive/15 px-3 py-1 text-xs font-black uppercase tracking-wider text-destructive">
+                      <AlertTriangle className="size-4" /> Prioridad Alta
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {selected.customer} · Pago con {selected.payment} · Recojo: <strong className="text-foreground">{selected.pickupTime || 'No especificado'}</strong>
                 </p>
               </div>
 
