@@ -114,9 +114,10 @@ export function SoporteView() {
                   </div>
                   <p className="text-sm text-muted-foreground line-clamp-2 ml-6">{t.detail}</p>
                   
+                  {/* AQUÍ SE ARREGLÓ EL COLOR DE LA LETRA (text-white/90) */}
                   {t.resolutionText && (
-                    <div className="ml-6 mt-2 rounded-lg bg-success/10 border border-success/20 p-3 text-xs text-success-foreground">
-                      <span className="font-bold block mb-1">Respuesta de Soporte:</span>
+                    <div className="ml-6 mt-2 rounded-lg bg-success/10 border border-success/20 p-3 text-sm text-white/90">
+                      <span className="font-bold block mb-1 text-success">Respuesta de Soporte:</span>
                       {t.resolutionText}
                     </div>
                   )}
