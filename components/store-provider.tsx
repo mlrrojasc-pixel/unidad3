@@ -44,6 +44,19 @@ export interface Complaint {
   email: string
   type: 'Reembolso' | 'Queja de servicio' | 'Producto en mal estado' | 'Sugerencia'
   detail: string
+  image?: string // FOTO DE EVIDENCIA
+  resolutionStatus?: 'Aprobado' | 'Rechazado' // VEREDICTO ADMIN
+  resolutionText?: string // JUSTIFICACIÓN ADMIN
+  createdAt: string
+}
+
+export interface SupportTicket {
+  id: string
+  topic: string
+  detail: string
+  status: 'Abierto' | 'En revisión' | 'Resuelto'
+  urgent: boolean
+  resolutionText?: string
   createdAt: string
 }
 
@@ -83,10 +96,14 @@ interface StoreContextValue {
   completedOrders: CompletedOrder[]
   deliveredOrders: CompletedOrder[]
   complaints: Complaint[]
+  tickets: SupportTicket[] // TICKETS DE EMPLEADO
   readyCount: number
   completeOrder: (id: string, substitutionNote?: string) => void
   deliverOrder: (id: string) => void
   addComplaint: (data: Omit<Complaint, 'id' | 'createdAt'>) => void
+  resolveComplaint: (id: string, status: 'Aprobado' | 'Rechazado', text: string) => void // NUEVO
+  addTicket: (topic: string, detail: string, urgent: boolean) => void // NUEVO
+  resolveTicket: (id: string, status: 'En revisión' | 'Resuelto', text?: string) => void // NUEVO
   placeOrder: (payment: PaymentMethod, substitution: boolean) => PlaceOrderResult
   toast: string | null
   showToast: (message: string) => void
@@ -129,6 +146,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [completedOrders, setCompletedOrders] = useState<CompletedOrder[]>([])
   const [deliveredOrders, setDeliveredOrders] = useState<CompletedOrder[]>([])
   const [complaints, setComplaints] = useState<Complaint[]>([])
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
 
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<'Todo' | Category>('Todo')
@@ -137,7 +155,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [authMode, setAuthMode] = useState<AuthMode | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 1. Primero leemos toda la memoria guardada antes de permitir escrituras
   useEffect(() => {
     setCartQty(getLocalData('lacosmina_cart', {}))
     setSede(getLocalData('lacosmina_sede', SEDES[0]))
@@ -147,10 +164,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCompletedOrders(getLocalData('lacosmina_completed', []))
     setDeliveredOrders(getLocalData('lacosmina_delivered', []))
     setComplaints(getLocalData('lacosmina_complaints', []))
+    setTickets(getLocalData('lacosmina_tickets', []))
     setHydrated(true)
   }, [])
 
-  // 2. Solo guardamos cuando hydrated es true (evita que se borren al recargar)
   useEffect(() => {
     if (hydrated) window.localStorage.setItem('lacosmina_cart', JSON.stringify(cartQty))
   }, [cartQty, hydrated])
@@ -182,6 +199,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (hydrated) window.localStorage.setItem('lacosmina_complaints', JSON.stringify(complaints))
   }, [complaints, hydrated])
+
+  useEffect(() => {
+    if (hydrated) window.localStorage.setItem('lacosmina_tickets', JSON.stringify(tickets))
+  }, [tickets, hydrated])
 
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -336,23 +357,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         createdAt: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
       }
       setComplaints((prev) => [newComplaint, ...prev])
-      showToast('Reclamo registrado en el Libro de Reclamaciones')
-
-      // Si pidió reembolso, actualiza también la columna Reembolso en Google Sheets
-      if (data.orderId) {
-        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${encodeURIComponent(data.orderId)}`, {
-          method: 'PATCH',
-          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            data: {
-              'Reembolso': `${data.type}: ${data.detail}`,
-            },
-          }),
-        }).catch(() => {})
-      }
+      showToast('Reclamo registrado exitosamente')
     },
     [showToast],
   )
+
+  const resolveComplaint = useCallback((id: string, status: 'Aprobado' | 'Rechazado', text: string) => {
+    setComplaints((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, resolutionStatus: status, resolutionText: text } : c))
+    )
+    showToast(`Reclamo ${id} marcado como ${status}`)
+  }, [showToast])
+
+  const addTicket = useCallback((topic: string, detail: string, urgent: boolean) => {
+    const newTicket: SupportTicket = {
+      id: `T-${Math.floor(100 + Math.random() * 900)}`,
+      topic,
+      detail,
+      status: 'Abierto',
+      urgent,
+      createdAt: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
+    }
+    setTickets((prev) => [newTicket, ...prev])
+    showToast('Ticket de soporte enviado')
+  }, [showToast])
+
+  const resolveTicket = useCallback((id: string, status: 'En revisión' | 'Resuelto', text?: string) => {
+    setTickets((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, status, resolutionText: text } : t))
+    )
+    showToast(`Ticket ${id} actualizado a ${status}`)
+  }, [showToast])
 
   const placeOrder = useCallback(
     (payment: PaymentMethod, substitution: boolean): PlaceOrderResult => {
@@ -417,10 +452,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     completedOrders,
     deliveredOrders,
     complaints,
+    tickets,
     readyCount,
     completeOrder,
     deliverOrder,
     addComplaint,
+    resolveComplaint,
+    addTicket,
+    resolveTicket,
     placeOrder,
     toast,
     showToast,
