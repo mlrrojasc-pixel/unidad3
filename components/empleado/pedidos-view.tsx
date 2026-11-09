@@ -1,7 +1,19 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Check, CheckCircle2, Inbox, QrCode, RefreshCw, ScanLine, Timer, Edit3 } from 'lucide-react'
+import {
+  Check,
+  CheckCircle2,
+  Inbox,
+  QrCode,
+  RefreshCw,
+  ScanLine,
+  Timer,
+  Edit3,
+  PackageCheck,
+  ShieldAlert,
+  Lock,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
 import { useStore } from '@/components/store-provider'
@@ -31,59 +43,94 @@ function timerTone(seconds: number) {
   return 'text-success'
 }
 
+type EmployeeTab = 'pendientes' | 'listos' | 'entregados' | 'reclamos'
+
 export function PedidosView() {
-  const { orders, completedOrders, completeOrder } = useStore()
+  const { orders, completedOrders, deliveredOrders, complaints, completeOrder, deliverOrder } = useStore()
   const now = useNow()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [validated, setValidated] = useState<Record<string, boolean>>({})
   const [picked, setPicked] = useState<Record<string, boolean>>({})
-  
-  const [activeTab, setActiveTab] = useState<'pendientes' | 'listos'>('pendientes')
+
+  const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
   const [substitutionNote, setSubstitutionNote] = useState('')
 
   const sorted = [...orders].sort((a, b) => remaining(a, now) - remaining(b, now))
-  const selected = activeTab === 'pendientes' 
-    ? (orders.find((o) => o.id === selectedId) ?? sorted[0])
-    : completedOrders.find((o) => o.id === selectedId)
+
+  const selected =
+    activeTab === 'pendientes'
+      ? (orders.find((o) => o.id === selectedId) ?? sorted[0])
+      : activeTab === 'listos'
+        ? (completedOrders.find((o) => o.id === selectedId) ?? completedOrders[0])
+        : activeTab === 'entregados'
+          ? (deliveredOrders.find((o) => o.id === selectedId) ?? deliveredOrders[0])
+          : null
 
   const handleReady = (order: Order) => {
     completeOrder(order.id, substitutionNote.trim())
     setSubstitutionNote('')
-
     const index = sorted.findIndex((o) => o.id === order.id)
     const next = sorted[index + 1] ?? sorted[index - 1]
     setSelectedId(next?.id ?? null)
   }
 
-  const hasSubstitutions = selected?.items.some(item => item.substitute)
+  const handleDeliver = (orderId: string) => {
+    deliverOrder(orderId)
+    setSelectedId(null)
+  }
+
+  const hasSubstitutions = selected?.items.some((item) => item.substitute)
 
   return (
-    <div className="grid h-full min-h-0 md:grid-cols-[minmax(260px,360px)_1fr]">
+    <div className="grid h-full min-h-0 md:grid-cols-[minmax(300px,390px)_1fr]">
       <section aria-label="Cola de pedidos" className="flex min-h-0 flex-col border-border md:border-r">
-        <div className="flex border-b border-border">
+        {/* 4 Pestañas operativas */}
+        <div className="grid grid-cols-4 border-b border-border text-center">
           <button
+            type="button"
             onClick={() => { setActiveTab('pendientes'); setSelectedId(null) }}
             className={cn(
-              "flex-1 py-3 text-sm font-bold uppercase tracking-wide",
-              activeTab === 'pendientes' ? "border-b-2 border-primary text-primary" : "text-muted-foreground hover:text-foreground"
+              'py-3 text-[11px] font-bold uppercase tracking-tight',
+              activeTab === 'pendientes' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             Pendientes ({orders.length})
           </button>
           <button
+            type="button"
             onClick={() => { setActiveTab('listos'); setSelectedId(null) }}
             className={cn(
-              "flex-1 py-3 text-sm font-bold uppercase tracking-wide",
-              activeTab === 'listos' ? "border-b-2 border-primary text-primary" : "text-muted-foreground hover:text-foreground"
+              'py-3 text-[11px] font-bold uppercase tracking-tight',
+              activeTab === 'listos' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             Listos ({completedOrders.length})
           </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab('entregados'); setSelectedId(null) }}
+            className={cn(
+              'py-3 text-[11px] font-bold uppercase tracking-tight',
+              activeTab === 'entregados' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Entregados ({deliveredOrders.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => { setActiveTab('reclamos'); setSelectedId(null) }}
+            className={cn(
+              'py-3 text-[11px] font-bold uppercase tracking-tight',
+              activeTab === 'reclamos' ? 'border-b-2 border-primary text-primary' : 'text-muted-foreground hover:text-foreground',
+            )}
+          >
+            Reclamos ({complaints.length})
+          </button>
         </div>
 
         <ul className="flex max-h-64 flex-col gap-2 overflow-y-auto px-3 py-3 md:max-h-none md:flex-1">
-          {activeTab === 'pendientes' ? (
+          {activeTab === 'pendientes' && (
             <>
               {sorted.map((order) => {
                 const secs = remaining(order, now)
@@ -93,7 +140,6 @@ export function PedidosView() {
                     <button
                       type="button"
                       onClick={() => setSelectedId(order.id)}
-                      aria-pressed={active}
                       className={cn(
                         'w-full rounded-xl border p-4 text-left transition-colors',
                         active ? 'border-brand-yellow bg-brand-yellow/10' : 'border-border bg-card hover:bg-accent',
@@ -102,15 +148,13 @@ export function PedidosView() {
                       <div className="flex items-center justify-between">
                         <span className="font-black">{order.id}</span>
                         <span className={cn('flex items-center gap-1 font-mono text-lg font-bold tabular-nums', timerTone(secs))}>
-                          <Timer className="size-4" aria-hidden="true" />
+                          <Timer className="size-4" />
                           {secs < 0 ? 'Vencido' : formatTime(secs)}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
                         <span>{order.customer}</span>
-                        <span>
-                          {order.items.reduce((n, i) => n + i.qty, 0)} items · {order.payment}
-                        </span>
+                        <span>{order.items.reduce((n, i) => n + i.qty, 0)} items · {order.payment}</span>
                       </div>
                     </button>
                   </li>
@@ -118,13 +162,14 @@ export function PedidosView() {
               })}
               {orders.length === 0 && (
                 <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
-                  <Inbox className="size-10" aria-hidden="true" />
+                  <Inbox className="size-10" />
                   <p className="mt-2 font-semibold">No hay pedidos pendientes</p>
-                  <p className="text-xs">Los nuevos pedidos aparecerán aquí.</p>
                 </li>
               )}
             </>
-          ) : (
+          )}
+
+          {activeTab === 'listos' && (
             <>
               {completedOrders.map((order) => {
                 const active = selected?.id === order.id
@@ -133,7 +178,43 @@ export function PedidosView() {
                     <button
                       type="button"
                       onClick={() => setSelectedId(order.id)}
-                      aria-pressed={active}
+                      className={cn(
+                        'w-full rounded-xl border p-4 text-left transition-colors',
+                        active ? 'border-brand-yellow bg-brand-yellow/10' : 'border-border bg-card hover:bg-accent',
+                      )}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-black">{order.id}</span>
+                        <span className="rounded-full bg-brand-yellow/20 px-2.5 py-0.5 text-xs font-bold text-brand-yellow">
+                          Por recoger
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
+                        <span>{order.customer}</span>
+                        <span>Armado {order.readyAt ?? ''}</span>
+                      </div>
+                    </button>
+                  </li>
+                )
+              })}
+              {completedOrders.length === 0 && (
+                <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
+                  <CheckCircle2 className="size-10" />
+                  <p className="mt-2 font-semibold">Ningún pedido esperando recojo</p>
+                </li>
+              )}
+            </>
+          )}
+
+          {activeTab === 'entregados' && (
+            <>
+              {deliveredOrders.map((order) => {
+                const active = selected?.id === order.id
+                return (
+                  <li key={order.id}>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedId(order.id)}
                       className={cn(
                         'w-full rounded-xl border p-4 text-left transition-colors',
                         active ? 'border-success bg-success/10' : 'border-border bg-card hover:bg-accent',
@@ -141,9 +222,9 @@ export function PedidosView() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="font-black">{order.id}</span>
-                        <span className="flex items-center gap-1 text-sm font-bold text-success">
-                          <CheckCircle2 className="size-4" aria-hidden="true" />
-                          Listo
+                        <span className="flex items-center gap-1 text-xs font-bold text-success">
+                          <PackageCheck className="size-4" />
+                          Entregado {order.deliveredAt ?? ''}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
@@ -154,10 +235,35 @@ export function PedidosView() {
                   </li>
                 )
               })}
-              {completedOrders.length === 0 && (
+              {deliveredOrders.length === 0 && (
                 <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
-                  <CheckCircle2 className="size-10" aria-hidden="true" />
-                  <p className="mt-2 font-semibold">No hay pedidos listos aún</p>
+                  <PackageCheck className="size-10" />
+                  <p className="mt-2 font-semibold">Aún no hay pedidos entregados</p>
+                </li>
+              )}
+            </>
+          )}
+
+          {activeTab === 'reclamos' && (
+            <>
+              {complaints.map((c) => (
+                <li key={c.id} className="rounded-xl border border-border bg-card p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-black text-primary">{c.id}</span>
+                    <span className="rounded-md bg-primary/15 px-2 py-0.5 text-xs font-bold text-primary">
+                      {c.type}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs font-semibold">
+                    Pedido: {c.orderId} · Cliente: {c.customer}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{c.createdAt}</p>
+                </li>
+              ))}
+              {complaints.length === 0 && (
+                <li className="flex flex-col items-center py-12 text-center text-muted-foreground">
+                  <ShieldAlert className="size-10" />
+                  <p className="mt-2 font-semibold">Sin reclamos registrados</p>
                 </li>
               )}
             </>
@@ -165,20 +271,68 @@ export function PedidosView() {
         </ul>
       </section>
 
-      <section aria-label="Detalle del pedido" className="flex min-h-0 flex-col overflow-y-auto border-t border-border md:border-t-0">
-        {selected ? (
+      {/* PANEL DERECHO */}
+      <section aria-label="Detalle" className="flex min-h-0 flex-col overflow-y-auto border-t border-border md:border-t-0">
+        {activeTab === 'reclamos' ? (
+          <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+            <div className="flex items-center justify-between rounded-xl border border-brand-yellow/40 bg-brand-yellow/10 p-4">
+              <div className="flex items-center gap-3">
+                <Lock className="size-5 text-brand-yellow" />
+                <div>
+                  <h2 className="text-sm font-black uppercase">Bandeja de Reclamos y Reembolsos (Solo Lectura)</h2>
+                  <p className="text-xs text-muted-foreground">
+                    El personal de primera línea solo puede visualizar los tickets. La resolución y extorno de dinero corresponde al Área de Atención al Cliente / Administración.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {complaints.length === 0 ? (
+              <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
+                <CheckCircle2 className="size-12 text-success" />
+                <p className="mt-2 font-bold text-foreground">No existen quejas ni solicitudes de reembolso</p>
+              </div>
+            ) : (
+              <ul className="space-y-3">
+                {complaints.map((c) => (
+                  <li key={c.id} className="rounded-xl border border-border bg-card p-5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <span className="text-lg font-black">{c.id}</span>
+                        <span className="ml-2 text-sm text-muted-foreground">· Pedido afectado: <strong>{c.orderId}</strong></span>
+                      </div>
+                      <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-primary">
+                        {c.type}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Cliente: <strong>{c.customer}</strong> ({c.email}) · Fecha: {c.createdAt}
+                    </p>
+                    <div className="mt-3 rounded-lg border border-border bg-muted/40 p-3 text-sm">
+                      {c.detail}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : selected ? (
           <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <p className="text-xs font-bold uppercase text-muted-foreground">
-                  {activeTab === 'pendientes' ? 'Pedido activo' : 'Pedido completado'}
+                  {activeTab === 'pendientes'
+                    ? '1. Armando pedido'
+                    : activeTab === 'listos'
+                      ? '2. Listo en estante (Esperando al cliente)'
+                      : '3. Pedido entregado'}
                 </p>
                 <h2 className="text-3xl font-black">{selected.id}</h2>
                 <p className="text-sm text-muted-foreground">
                   {selected.customer} · Pago con {selected.payment}
                 </p>
               </div>
-              
+
               {activeTab === 'pendientes' && (
                 <div className="rounded-xl bg-card px-4 py-3 text-right">
                   <p className="text-xs text-muted-foreground">Tiempo restante</p>
@@ -192,13 +346,13 @@ export function PedidosView() {
             <div className="flex flex-wrap gap-2">
               {selected.substitution && (
                 <span className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-semibold">
-                  <RefreshCw className="size-3.5" aria-hidden="true" />
+                  <RefreshCw className="size-3.5" />
                   Acepta sustitución
                 </span>
               )}
-              {(validated[selected.id] || activeTab === 'listos') && (
+              {(validated[selected.id] || activeTab === 'entregados') && (
                 <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
-                  <CheckCircle2 className="size-3.5" aria-hidden="true" />
+                  <CheckCircle2 className="size-3.5" />
                   QR validado
                 </span>
               )}
@@ -207,18 +361,14 @@ export function PedidosView() {
             <ul className="divide-y divide-border rounded-xl border border-border bg-card">
               {selected.items.map((item, i) => {
                 const key = `${selected.id}-${i}`
-                const done = activeTab === 'listos' ? true : picked[key]
+                const done = activeTab !== 'pendientes' ? true : picked[key]
                 return (
                   <li key={key}>
                     <button
                       type="button"
                       onClick={() => activeTab === 'pendientes' && setPicked((p) => ({ ...p, [key]: !p[key] }))}
-                      aria-pressed={done}
-                      disabled={activeTab === 'listos'}
-                      className={cn(
-                        "flex w-full items-center gap-4 p-4 text-left",
-                        activeTab === 'pendientes' && "hover:bg-accent"
-                      )}
+                      disabled={activeTab !== 'pendientes'}
+                      className={cn('flex w-full items-center gap-4 p-4 text-left', activeTab === 'pendientes' && 'hover:bg-accent')}
                     >
                       <span
                         className={cn(
@@ -226,12 +376,12 @@ export function PedidosView() {
                           done ? 'border-success bg-success text-success-foreground' : 'border-muted-foreground/40',
                         )}
                       >
-                        {done && <Check className="size-4" aria-hidden="true" />}
+                        {done && <Check className="size-4" />}
                       </span>
                       <span className={cn('flex-1 font-semibold', done && activeTab === 'pendientes' && 'text-muted-foreground line-through')}>
                         {item.name}
                         {item.substitute && (
-                          <span className="ml-2 rounded-md bg-brand-yellow px-2 py-0.5 text-xs font-bold text-brand-yellow-foreground no-underline">
+                          <span className="ml-2 rounded-md bg-brand-yellow px-2 py-0.5 text-xs font-bold text-brand-yellow-foreground">
                             Sustituir
                           </span>
                         )}
@@ -255,68 +405,70 @@ export function PedidosView() {
 
             {hasSubstitutions && activeTab === 'pendientes' && (
               <div className="rounded-xl border border-brand-yellow bg-brand-yellow/5 p-4">
-                <label htmlFor="substitution-note" className="flex items-center gap-2 text-sm font-bold text-brand-yellow mb-2">
+                <label htmlFor="substitution-note" className="mb-2 flex items-center gap-2 text-sm font-bold text-brand-yellow">
                   <Edit3 className="size-4" />
-                  Registro de Sustitución
+                  Especificar con qué producto se está sustituyendo
                 </label>
                 <textarea
                   id="substitution-note"
-                  placeholder="Ej: Se cambió Inka Chips por Lays..."
+                  placeholder="Ej: Se sustituyó Leche Gloria por Leche Ideal..."
                   value={substitutionNote}
                   onChange={(e) => setSubstitutionNote(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background p-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand-yellow min-h-[80px]"
+                  className="min-h-[80px] w-full rounded-lg border border-input bg-background p-3 text-sm"
                 />
               </div>
             )}
 
-            {activeTab === 'listos' && 'substitutionNote' in selected && selected.substitutionNote && (
-               <div className="rounded-xl border border-border bg-muted p-4">
-               <p className="text-sm font-bold text-muted-foreground mb-1">Nota de sustitución:</p>
-               <p className="text-sm">{selected.substitutionNote}</p>
-             </div>
+            {activeTab !== 'pendientes' && 'substitutionNote' in selected && selected.substitutionNote && (
+              <div className="rounded-xl border border-border bg-muted p-4">
+                <p className="mb-1 text-sm font-bold text-muted-foreground">Producto usado como sustituto:</p>
+                <p className="text-sm">{selected.substitutionNote}</p>
+              </div>
             )}
 
             {activeTab === 'pendientes' && (
+              <div className="mt-auto">
+                <button
+                  type="button"
+                  onClick={() => handleReady(selected)}
+                  className="flex h-16 w-full items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95"
+                >
+                  <CheckCircle2 className="size-6" />
+                  1. Marcar Pedido como Listo (Terminado de armar)
+                </button>
+              </div>
+            )}
+
+            {activeTab === 'listos' && (
               <div className="mt-auto grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setScannerOpen(true)}
                   className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95"
                 >
-                  <QrCode className="size-6" aria-hidden="true" />
-                  Escanear QR
+                  <QrCode className="size-6" />
+                  Escanear QR del Cliente
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleReady(selected)}
+                  onClick={() => handleDeliver(selected.id)}
                   className="flex h-16 items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95"
                 >
-                  <CheckCircle2 className="size-6" aria-hidden="true" />
-                  Marcar como Listo
+                  <PackageCheck className="size-6" />
+                  2. Confirmar Entrega al Cliente
                 </button>
               </div>
             )}
           </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-muted-foreground">
-            {activeTab === 'pendientes' ? (
-              <>
-                <CheckCircle2 className="size-14 text-success" aria-hidden="true" />
-                <p className="mt-3 text-lg font-bold text-foreground">¡Todo al día!</p>
-                <p className="text-sm">No hay pedidos por preparar en este momento.</p>
-              </>
-            ) : (
-              <>
-                <Inbox className="size-14 text-muted-foreground/50" aria-hidden="true" />
-                <p className="mt-3 text-lg font-bold text-foreground">Historial vacío</p>
-                <p className="text-sm">Aquí aparecerán los pedidos que marques como listos.</p>
-              </>
-            )}
+            <Inbox className="size-12 opacity-40" />
+            <p className="mt-3 text-lg font-bold text-foreground">Sin pedidos seleccionados</p>
           </div>
         )}
       </section>
 
-      {scannerOpen && selected && activeTab === 'pendientes' && (
+      {scannerOpen && selected && (
         <QrScannerModal
           orderId={selected.id}
           onValidated={() => setValidated((v) => ({ ...v, [selected.id]: true }))}
@@ -359,31 +511,26 @@ function QrScannerModal({
         <div className="flex flex-col items-center gap-4 p-6 pt-10">
           <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black">
             <div className="absolute inset-6 rounded-xl border-2 border-dashed border-white/20" />
-            {['left-4 top-4 border-l-4 border-t-4', 'right-4 top-4 border-r-4 border-t-4', 'bottom-4 left-4 border-b-4 border-l-4', 'bottom-4 right-4 border-b-4 border-r-4'].map(
-              (pos) => (
-                <span key={pos} className={cn('absolute size-10 rounded-sm border-brand-yellow', pos)} />
-              ),
-            )}
             {status === 'scanning' ? (
               <>
-                <QrCode className="absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 text-white/25" aria-hidden="true" />
+                <QrCode className="absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 text-white/25" />
                 <span className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
               </>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-success/90 text-success-foreground animate-in fade-in zoom-in-90">
-                <CheckCircle2 className="size-20" aria-hidden="true" />
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-success/90 text-success-foreground">
+                <CheckCircle2 className="size-20" />
                 <p className="mt-2 text-2xl font-black">QR Validado</p>
               </div>
             )}
           </div>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
             {status === 'scanning' ? (
               <>
-                <ScanLine className="size-4 animate-pulse" aria-hidden="true" />
+                <ScanLine className="size-4 animate-pulse" />
                 Escaneando código del pedido {orderId}...
               </>
             ) : (
-              <span className="font-semibold text-success">Pedido {orderId} verificado correctamente</span>
+              <span className="font-semibold text-success">Pedido {orderId} verificado para entrega</span>
             )}
           </p>
         </div>
