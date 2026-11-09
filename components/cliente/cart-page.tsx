@@ -13,12 +13,11 @@ export function CartPage() {
   const { cart, cartCount, cartTotal, updateQty, clearCart, sede, unavailableCount } = useStore()
   const [confirmed, setConfirmed] = useState<ConfirmedOrder | null>(null)
 
-  // NUEVA FUNCIÓN PARA ENVIAR AL EXCEL
   const procesarYGuardarPedido = async (orden: ConfirmedOrder) => {
     // 1. Mostrar la pantalla de éxito en la web
     setConfirmed(orden)
 
-    // 2. Enviar los datos a tu Google Sheet (vía SheetDB)
+    // 2. Enviar TODOS los datos a tu Google Sheet (vía SheetDB)
     try {
       await fetch('https://sheetdb.io/api/v1/5f2glnefammpr', {
         method: 'POST',
@@ -31,7 +30,13 @@ export function CartPage() {
             {
               'ID de Pedido': orden.orderId,
               'Cliente': orden.customer,
-              'Estado': 'Pendiente'
+              'Celular': 'Por registrar', 
+              'Horario de Recojo': orden.pickupTime,
+              'Estado': 'Pendiente',
+              'Sustitución': orden.substituted > 0 ? 'Aprobada' : 'Ninguna',
+              'Reembolso': '-',
+              'Calificación 1-5': '',
+              'Código QR': ''
             }
           ]
         })
