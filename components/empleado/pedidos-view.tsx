@@ -31,12 +31,8 @@ function timerTone(seconds: number) {
   return 'text-success'
 }
 
-interface CompletedOrder extends Order {
-  substitutionNote?: string
-}
-
 export function PedidosView() {
-  const { orders, completeOrder } = useStore()
+  const { orders, completedOrders, completeOrder } = useStore()
   const now = useNow()
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -44,25 +40,7 @@ export function PedidosView() {
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   
   const [activeTab, setActiveTab] = useState<'pendientes' | 'listos'>('pendientes')
-  const [completedOrders, setCompletedOrders] = useState<CompletedOrder[]>([])
   const [substitutionNote, setSubstitutionNote] = useState('')
-
-  // Cargar historial de listos al iniciar
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const saved = window.localStorage.getItem('lacosmina_completed_orders')
-      if (saved) {
-        try { setCompletedOrders(JSON.parse(saved)) } catch (e) {}
-      }
-    }
-  }, [])
-
-  // Guardar historial de listos en memoria
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('lacosmina_completed_orders', JSON.stringify(completedOrders))
-    }
-  }, [completedOrders])
 
   const sorted = [...orders].sort((a, b) => remaining(a, now) - remaining(b, now))
   const selected = activeTab === 'pendientes' 
@@ -70,17 +48,12 @@ export function PedidosView() {
     : completedOrders.find((o) => o.id === selectedId)
 
   const handleReady = (order: Order) => {
-    const completedOrder: CompletedOrder = {
-      ...order,
-      substitutionNote: substitutionNote.trim()
-    }
-    setCompletedOrders(prev => [completedOrder, ...prev])
+    completeOrder(order.id, substitutionNote.trim())
     setSubstitutionNote('')
 
     const index = sorted.findIndex((o) => o.id === order.id)
     const next = sorted[index + 1] ?? sorted[index - 1]
     setSelectedId(next?.id ?? null)
-    completeOrder(order.id)
   }
 
   const hasSubstitutions = selected?.items.some(item => item.substitute)
