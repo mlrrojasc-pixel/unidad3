@@ -1,5 +1,10 @@
-import { PedidosView } from '@/components/empleado/pedidos-view'
+import { EmpleadoShell } from '@/components/empleado/empleado-view'
+import { ReclamosView } from '@/components/empleado/reclamos-view'
 
-export default function Page() {
-  return <PedidosView />
+export default function ReclamosPage() {
+  return (
+    <EmpleadoShell>
+      <ReclamosView />
+    </EmpleadoShell>
+  )
 }
