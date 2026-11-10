@@ -26,7 +26,7 @@ import { useStore, type Complaint } from '@/components/store-provider'
 import { PaymentSection, type ConfirmedOrder } from '@/components/cliente/payment-section'
 
 // CAMBIA AQUÍ TU NÚMERO PERSONAL CON EL 51 DELANTE
-const NUMERO_WHATSAPP = '51987654321'
+const NUMERO_WHATSAPP = '51904827537'
 
 export function CartPage() {
   const { cart, cartCount, cartTotal, updateQty, clearCart, sede, unavailableCount } = useStore()
