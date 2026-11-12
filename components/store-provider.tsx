@@ -157,6 +157,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [authMode, setAuthMode] = useState<AuthMode | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Carga inicial de datos de usuarios
   useEffect(() => {
     setCartQty(getLocalData('lacosmina_cart', {}))
     setSede(getLocalData('lacosmina_sede', SEDES[0]))
@@ -167,12 +168,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setComplaints(getLocalData('lacosmina_complaints', []))
     setTickets(getLocalData('lacosmina_tickets', []))
     
-    // Carga inicial de memoria
     const cuentasLocales = getLocalData('lacosmina_accounts', [])
     setAccounts(cuentasLocales)
     setHydrated(true)
 
-    // 👇 SOLUCIÓN: Descargar cuentas de SheetDB para reconocerlas en otros dispositivos
     fetch('https://sheetdb.io/api/v1/0793nb34hurdw')
       .then(res => res.json())
       .then(data => {
@@ -193,41 +192,62 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .catch(error => console.error('Error al sincronizar cuentas:', error))
   }, [])
 
+  // NUEVO: Sincronizar historial de pedidos del cliente al iniciar sesión
   useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_cart', JSON.stringify(cartQty))
-  }, [cartQty, hydrated])
+    if (user && user.phone) {
+      fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/search?Celular=${user.phone}`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            const activos: AppOrder[] = []
+            const completados: CompletedOrder[] = []
+            const entregados: CompletedOrder[] = []
 
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_sede', JSON.stringify(sede))
-  }, [sede, hydrated])
+            data.forEach((fila: any) => {
+              let itemsParsed = []
+              try { 
+                itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : [] 
+              } catch(e) {}
 
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_accounts', JSON.stringify(accounts))
-  }, [accounts, hydrated])
+              const baseOrder = {
+                id: fila['ID de Pedido'],
+                customer: fila['Cliente'],
+                sede: SEDES[0],
+                payment: 'Tarjeta',
+                pickupTime: fila['Horario de Recojo'],
+                slaSeconds: 1800,
+                deadline: Date.now() + 1800000,
+                substitution: fila['Sustitución'] !== 'Ninguna',
+                items: itemsParsed,
+              }
 
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_currentUser', JSON.stringify(user))
-  }, [user, hydrated])
+              if (fila['Estado'] === 'Entregado') {
+                entregados.push({ ...baseOrder, deliveredAt: 'Entregado' } as CompletedOrder)
+              } else if (fila['Estado'] === 'Listo para recoger') {
+                completados.push({ ...baseOrder, readyAt: 'Listo' } as CompletedOrder)
+              } else {
+                activos.push(baseOrder as AppOrder)
+              }
+            })
 
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_orders', JSON.stringify(orders))
-  }, [orders, hydrated])
+            setOrders(activos)
+            setCompletedOrders(completados)
+            setDeliveredOrders(entregados)
+          }
+        })
+        .catch(error => console.error('Error al sincronizar pedidos:', error))
+    }
+  }, [user])
 
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_completed', JSON.stringify(completedOrders))
-  }, [completedOrders, hydrated])
-
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_delivered', JSON.stringify(deliveredOrders))
-  }, [deliveredOrders, hydrated])
-
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_complaints', JSON.stringify(complaints))
-  }, [complaints, hydrated])
-
-  useEffect(() => {
-    if (hydrated) window.localStorage.setItem('lacosmina_tickets', JSON.stringify(tickets))
-  }, [tickets, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_cart', JSON.stringify(cartQty)) }, [cartQty, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_sede', JSON.stringify(sede)) }, [sede, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_accounts', JSON.stringify(accounts)) }, [accounts, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_currentUser', JSON.stringify(user)) }, [user, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_orders', JSON.stringify(orders)) }, [orders, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_completed', JSON.stringify(completedOrders)) }, [completedOrders, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_delivered', JSON.stringify(deliveredOrders)) }, [deliveredOrders, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_complaints', JSON.stringify(complaints)) }, [complaints, hydrated])
+  useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_tickets', JSON.stringify(tickets)) }, [tickets, hydrated])
 
   const showToast = useCallback((message: string) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -245,92 +265,71 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const setStockAllSedes = useCallback((id: string, available: boolean) => {
-    setProducts((prev) =>
-      prev.map((p) =>
-        p.id === id ? { ...p, stock: Object.fromEntries(SEDES.map((s) => [s, available])) as Product['stock'] } : p,
-      ),
-    )
+    setProducts((prev) => prev.map((p) => p.id === id ? { ...p, stock: Object.fromEntries(SEDES.map((s) => [s, available])) as Product['stock'] } : p))
   }, [])
 
   const openAuth = useCallback((mode: AuthMode) => setAuthMode(mode), [])
   const closeAuth = useCallback(() => setAuthMode(null), [])
 
-  const register = useCallback(
-    (data: Account) => {
-      const email = data.email.trim().toLowerCase()
-      const domain = email.split('@')[1]
-      if (!domain || !VALID_DOMAINS.includes(domain)) {
-        return 'Usa un proveedor de correo válido (@gmail.com, @hotmail.com, @outlook.com, @icloud.com, @unac.edu.pe).'
-      }
-      if (accounts.some((a) => a.email.trim().toLowerCase() === email)) {
-        return 'Ya existe una cuenta con este correo. Inicia sesión.'
-      }
-      const account: Account = {
-        firstName: data.firstName.trim(),
-        lastName: data.lastName.trim(),
-        email,
-        phone: data.phone.trim(),
-        password: data.password.trim(),
-      }
-      setAccounts((prev) => [...prev, account])
-      const { password: _password, ...customer } = account
-      setUser(customer)
+  const register = useCallback((data: Account) => {
+    const email = data.email.trim().toLowerCase()
+    const domain = email.split('@')[1]
+    if (!domain || !VALID_DOMAINS.includes(domain)) return 'Usa un proveedor de correo válido.'
+    if (accounts.some((a) => a.email.trim().toLowerCase() === email)) return 'Ya existe una cuenta con este correo. Inicia sesión.'
+    
+    const account: Account = {
+      firstName: data.firstName.trim(),
+      lastName: data.lastName.trim(),
+      email,
+      phone: data.phone.trim(),
+      password: data.password.trim(),
+    }
+    setAccounts((prev) => [...prev, account])
+    const { password: _password, ...customer } = account
+    setUser(customer)
 
-      fetch('https://sheetdb.io/api/v1/0793nb34hurdw', {
-        method: 'POST',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          data: [{
-            'Nombre': account.firstName,
-            'Apellido': account.lastName,
-            'celular': account.phone,
-            'correo electrónico': account.email,
-            'contraseña': account.password,
-          }],
-        }),
-      }).catch(() => {})
+    fetch('https://sheetdb.io/api/v1/0793nb34hurdw', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: [{
+          'Nombre': account.firstName,
+          'Apellido': account.lastName,
+          'celular': account.phone,
+          'correo electrónico': account.email,
+          'contraseña': account.password,
+        }],
+      }),
+    }).catch(() => {})
 
-      return null
-    },
-    [accounts],
-  )
+    return null
+  }, [accounts])
 
-  const login = useCallback(
-    (email: string, password: string) => {
-      const cleanEmail = email.trim().toLowerCase()
-      const cleanPassword = password.trim()
-      const account = accounts.find((a) => a.email.trim().toLowerCase() === cleanEmail)
-      
-      if (!account) return 'No existe ninguna cuenta registrada con este correo.'
-      if (account.password.trim() !== cleanPassword) return 'Contraseña incorrecta.'
-      
-      const { password: _password, ...customer } = account
-      setUser(customer)
+  const login = useCallback((email: string, password: string) => {
+    const cleanEmail = email.trim().toLowerCase()
+    const cleanPassword = password.trim()
+    const account = accounts.find((a) => a.email.trim().toLowerCase() === cleanEmail)
+    
+    if (!account) return 'No existe ninguna cuenta registrada con este correo.'
+    if (account.password.trim() !== cleanPassword) return 'Contraseña incorrecta.'
+    
+    const { password: _password, ...customer } = account
+    setUser(customer)
 
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem('celular_cliente_actual', account.phone)
-      }
-
-      return null
-    },
-    [accounts],
-  )
+    if (typeof window !== 'undefined') window.localStorage.setItem('celular_cliente_actual', account.phone)
+    return null
+  }, [accounts])
 
   const logout = useCallback(() => {
     setUser(null)
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('celular_cliente_actual')
-    }
+    if (typeof window !== 'undefined') window.localStorage.removeItem('celular_cliente_actual')
   }, [])
 
-  const addToCart = useCallback(
-    (id: string) => {
-      const product = products.find((p) => p.id === id)
-      if (!product || !isAvailable(product, sede)) return
-      setCartQty((prev) => ({ ...prev, [id]: Math.min((prev[id] ?? 0) + 1, MAX_QTY) }))
-    },
-    [products, sede],
-  )
+  const addToCart = useCallback((id: string) => {
+    const product = products.find((p) => p.id === id)
+    if (!product || !isAvailable(product, sede)) return
+    setCartQty((prev) => ({ ...prev, [id]: Math.min((prev[id] ?? 0) + 1, MAX_QTY) }))
+  }, [products, sede])
 
   const updateQty = useCallback((id: string, delta: number) => {
     setCartQty((prev) => {
@@ -344,83 +343,66 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const clearCart = useCallback(() => setCartQty({}), [])
 
-  const cart = useMemo<CartLine[]>(
-    () =>
-      Object.entries(cartQty)
-        .map(([id, qty]) => {
-          const product = products.find((p) => p.id === id)!
-          return { product, qty, available: product ? isAvailable(product, sede) : false }
-        })
-        .filter((line) => line.product),
-    [cartQty, products, sede],
-  )
+  const cart = useMemo<CartLine[]>(() =>
+    Object.entries(cartQty)
+      .map(([id, qty]) => {
+        const product = products.find((p) => p.id === id)!
+        return { product, qty, available: product ? isAvailable(product, sede) : false }
+      })
+      .filter((line) => line.product),
+  [cartQty, products, sede])
 
   const cartCount = cart.reduce((sum, l) => sum + l.qty, 0)
   const cartTotal = cart.reduce((sum, l) => sum + l.qty * l.product.price, 0)
   const unavailableCount = cart.filter((l) => !l.available).length
   const qtyInCart = useCallback((id: string) => cartQty[id] ?? 0, [cartQty])
 
-  const completeOrder = useCallback(
-    (id: string, substitutionNote?: string) => {
-      setOrders((prev) => {
-        const orderToComplete = prev.find((o) => o.id === id)
-        if (orderToComplete) {
-          const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
-          setCompletedOrders((cPrev) => [
-            { ...orderToComplete, substitutionNote, readyAt: nowStr },
-            ...cPrev.filter((item) => item.id !== id),
-          ])
-        }
-        return prev.filter((o) => o.id !== id)
-      })
-      setReadyCount((n) => n + 1)
-      showToast(`Pedido ${id} listo para recojo`)
-
-      fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
-        method: 'PATCH',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: { 'Estado': 'Listo para recoger' } })
-      }).catch(() => {})
-    },
-    [showToast],
-  )
-
-  const deliverOrder = useCallback(
-    (id: string) => {
-      setCompletedOrders((prev) => {
-        const orderToDeliver = prev.find((o) => o.id === id)
-        if (orderToDeliver) {
-          const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
-          setDeliveredOrders((dPrev) => [
-            { ...orderToDeliver, deliveredAt: nowStr },
-            ...dPrev.filter((item) => item.id !== id),
-          ])
-        }
-        return prev.filter((o) => o.id !== id)
-      })
-      showToast(`Pedido ${id} entregado al cliente`)
-
-      fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
-        method: 'PATCH',
-        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-        body: JSON.stringify({ data: { 'Estado': 'Entregado' } })
-      }).catch(() => {})
-    },
-    [showToast],
-  )
-
-  const addComplaint = useCallback(
-    (data: Omit<Complaint, 'id' | 'createdAt'>) => {
-      const newComplaint: Complaint = {
-        ...data,
-        id: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
-        createdAt: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
+  const completeOrder = useCallback((id: string, substitutionNote?: string) => {
+    setOrders((prev) => {
+      const orderToComplete = prev.find((o) => o.id === id)
+      if (orderToComplete) {
+        const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+        setCompletedOrders((cPrev) => [{ ...orderToComplete, substitutionNote, readyAt: nowStr }, ...cPrev.filter((item) => item.id !== id)])
       }
-      setComplaints((prev) => [newComplaint, ...prev])
-      showToast('Reclamo registrado exitosamente')
-    },
-    [showToast],
-  )
+      return prev.filter((o) => o.id !== id)
+    })
+    setReadyCount((n) => n + 1)
+    showToast(`Pedido ${id} listo para recojo`)
+
+    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+      method: 'PATCH',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { 'Estado': 'Listo para recoger' } })
+    }).catch(() => {})
+  }, [showToast])
+
+  const deliverOrder = useCallback((id: string) => {
+    setCompletedOrders((prev) => {
+      const orderToDeliver = prev.find((o) => o.id === id)
+      if (orderToDeliver) {
+        const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+        setDeliveredOrders((dPrev) => [{ ...orderToDeliver, deliveredAt: nowStr }, ...dPrev.filter((item) => item.id !== id)])
+      }
+      return prev.filter((o) => o.id !== id)
+    })
+    showToast(`Pedido ${id} entregado al cliente`)
+
+    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+      method: 'PATCH',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { 'Estado': 'Entregado' } })
+    }).catch(() => {})
+  }, [showToast])
+
+  const addComplaint = useCallback((data: Omit<Complaint, 'id' | 'createdAt'>) => {
+    const newComplaint: Complaint = {
+      ...data,
+      id: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
+      createdAt: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
+    }
+    setComplaints((prev) => [newComplaint, ...prev])
+    showToast('Reclamo registrado exitosamente')
+  }, [showToast])
 
   const resolveComplaint = useCallback((id: string, status: 'Aprobado' | 'Rechazado', text: string) => {
     setComplaints((prev) => {
@@ -431,9 +413,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${target.orderId}`, {
           method: 'PATCH',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            data: { 'Reembolso': status === 'Aprobado' ? 'Reembolso procesado' : 'Rechazado' }
-          })
+          body: JSON.stringify({ data: { 'Reembolso': status === 'Aprobado' ? 'Reembolso procesado' : 'Rechazado' } })
         }).catch(() => {})
       }
       return next;
@@ -455,45 +435,57 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [showToast])
 
   const resolveTicket = useCallback((id: string, status: 'En revisión' | 'Resuelto', text?: string) => {
-    setTickets((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, status, resolutionText: text } : t))
-    )
+    setTickets((prev) => prev.map((t) => (t.id === id ? { ...t, status, resolutionText: text } : t)))
     showToast(`Ticket ${id} actualizado a ${status}`)
   }, [showToast])
 
-  const placeOrder = useCallback(
-    (payment: PaymentMethod, substitution: boolean, pickupTime: string): PlaceOrderResult => {
-      if (!user) return { ok: false, reason: 'auth' }
-      if (cart.length === 0) return { ok: false, reason: 'empty' }
-      const substituted = cart.filter((l) => !l.available).length
-      if (substituted > 0 && !substitution) return { ok: false, reason: 'substitution' }
-      const customer = `${user.firstName} ${user.lastName}`
-      const id = `LC-${Math.floor(10500 + Math.random() * 8999)}`
-      const slaSeconds = 30 * 60
-      setOrders((prev) => [
-        ...prev,
-        {
-          id,
-          customer,
-          sede,
-          payment,
-          pickupTime,
-          slaSeconds,
-          deadline: Date.now() + slaSeconds * 1000,
-          substitution,
-          items: cart.map((l) => ({
-            name: `${l.product.name} ${l.product.brand}`,
-            qty: l.qty,
-            price: l.product.price,
-            substitute: !l.available,
-          })),
-        },
-      ])
-      setCartQty({})
-      return { ok: true, orderId: id, customer, total: cartTotal, substituted }
-    },
-    [cart, cartTotal, sede, user],
-  )
+  // NUEVO: Enviar toda la información del pedido a SheetDB
+  const placeOrder = useCallback((payment: PaymentMethod, substitution: boolean, pickupTime: string): PlaceOrderResult => {
+    if (!user) return { ok: false, reason: 'auth' }
+    if (cart.length === 0) return { ok: false, reason: 'empty' }
+    
+    const substituted = cart.filter((l) => !l.available).length
+    if (substituted > 0 && !substitution) return { ok: false, reason: 'substitution' }
+    
+    const customer = `${user.firstName} ${user.lastName}`
+    const id = `LC-${Math.floor(10500 + Math.random() * 8999)}`
+    const slaSeconds = 30 * 60
+    
+    const itemsToSave = cart.map((l) => ({
+      name: `${l.product.name} ${l.product.brand}`,
+      qty: l.qty,
+      price: l.product.price,
+      substitute: !l.available,
+    }))
+
+    const newOrder: AppOrder = {
+      id, customer, sede, payment, pickupTime, slaSeconds,
+      deadline: Date.now() + slaSeconds * 1000,
+      substitution, items: itemsToSave,
+    }
+
+    setOrders((prev) => [...prev, newOrder])
+    setCartQty({})
+
+    fetch('https://sheetdb.io/api/v1/5f2glnefammpr', {
+      method: 'POST',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        data: [{
+          'ID de Pedido': id,
+          'Cliente': customer,
+          'Celular': user.phone,
+          'Horario de Recojo': pickupTime,
+          'Estado': 'En preparación en tienda',
+          'Sustitución': substitution ? 'Sí' : 'Ninguna',
+          'Reembolso': '-',
+          'Detalle': JSON.stringify(itemsToSave)
+        }]
+      })
+    }).catch(console.error)
+
+    return { ok: true, orderId: id, customer, total: cartTotal, substituted }
+  }, [cart, cartTotal, sede, user])
 
   const value: StoreContextValue = {
     startShift, products, setStock, setStockAllSedes, user, register, login, logout, authMode, openAuth,
