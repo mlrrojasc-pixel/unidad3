@@ -45,13 +45,13 @@ export function CartPage() {
         body: JSON.stringify({
           data: [
             {
-              'ID de Pedido': orden.orderId,
-              'Cliente': orden.customer,
-              'Celular': orden.phoneNumber,
-              'Horario de Recojo': orden.pickupTime,
-              'Estado': 'Compra confirmada',
-              'Sustitución': orden.substituted > 0 ? 'Aprobada' : 'Ninguna',
-              'Reembolso': '-',
+              'ID de Pedido': '',
+              'Cliente': '',
+              'Celular': '',
+              'Horario de Recojo': '',
+              'Estado': '',
+              'Sustitución': orden.substituted > 0 ? '' : '',
+              'Reembolso': '',
               'Calificación 1-5': '',
               'Código QR': '',
             },
