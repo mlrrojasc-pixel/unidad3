@@ -476,7 +476,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           'Cliente': customer,
           'Celular': user.phone,
           'Horario de Recojo': pickupTime,
-          'Estado': 'En preparación en tienda',
+          'Estado': 'Compra confirmada',
           'Sustitución': substitution ? 'Sí' : 'Ninguna',
           'Reembolso': '-',
           'Detalle': JSON.stringify(itemsToSave)
