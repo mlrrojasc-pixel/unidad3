@@ -42,22 +42,6 @@ export function CartPage() {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          data: [
-            {
-              'ID de Pedido': '',
-              'Cliente': '',
-              'Celular': '',
-              'Horario de Recojo': '',
-              'Estado': '',
-              'Sustitución': orden.substituted > 0 ? '' : '',
-              'Reembolso': '',
-              'Calificación 1-5': '',
-              'Código QR': '',
-            },
-          ],
-        }),
-      })
     } catch (error) {
       console.error('Error al conectar con Excel', error)
     }
