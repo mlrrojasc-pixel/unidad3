@@ -160,14 +160,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setCartQty(getLocalData('lacosmina_cart', {}))
     setSede(getLocalData('lacosmina_sede', SEDES[0]))
-    setAccounts(getLocalData('lacosmina_accounts', []))
     setUser(getLocalData('lacosmina_currentUser', null))
     setOrders(getLocalData('lacosmina_orders', INITIAL_ORDERS as AppOrder[]))
     setCompletedOrders(getLocalData('lacosmina_completed', []))
     setDeliveredOrders(getLocalData('lacosmina_delivered', []))
     setComplaints(getLocalData('lacosmina_complaints', []))
     setTickets(getLocalData('lacosmina_tickets', []))
+    
+    // Carga inicial de memoria
+    const cuentasLocales = getLocalData('lacosmina_accounts', [])
+    setAccounts(cuentasLocales)
     setHydrated(true)
+
+    // 👇 SOLUCIÓN: Descargar cuentas de SheetDB para reconocerlas en otros dispositivos
+    fetch('https://sheetdb.io/api/v1/0793nb34hurdw')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          const cuentasSincronizadas = data.map((fila: any) => ({
+            firstName: fila['Nombre'] || '',
+            lastName: fila['Apellido'] || '',
+            phone: fila['celular'] || '',
+            email: fila['correo electrónico'] || '',
+            password: fila['contraseña'] || ''
+          }))
+          setAccounts(cuentasSincronizadas)
+          if (typeof window !== 'undefined') {
+            window.localStorage.setItem('lacosmina_accounts', JSON.stringify(cuentasSincronizadas))
+          }
+        }
+      })
+      .catch(error => console.error('Error al sincronizar cuentas:', error))
   }, [])
 
   useEffect(() => {
@@ -284,7 +307,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const { password: _password, ...customer } = account
       setUser(customer)
 
-      // 👇 ESTA ES LA LÍNEA AGREGADA: Guarda el celular del cliente que inicia sesión
       if (typeof window !== 'undefined') {
         window.localStorage.setItem('celular_cliente_actual', account.phone)
       }
@@ -296,7 +318,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     setUser(null)
-    // Opcional: Limpiar el celular guardado al cerrar sesión
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('celular_cliente_actual')
     }
