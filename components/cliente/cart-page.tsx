@@ -35,6 +35,30 @@ export function CartPage() {
   const procesarYGuardarPedido = async (orden: ConfirmedOrder) => {
     setConfirmed(orden)
 
+        try {
+      await fetch('https://sheetdb.io/api/v1/5f2glnefammpr', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+       body: JSON.stringify({
+          data: [
+            {
+                'ID de Pedido': orden.orderId,
+              'Cliente': orden.customer,
+              'Celular': orden.phoneNumber,
+              'Horario de Recojo': orden.pickupTime,
+              'Estado': 'Compra confirmada',
+              'Sustitución': orden.substituted > 0 ? 'Aprobada' : 'Ninguna',
+              'Reembolso': '-',
+              'Calificación 1-5': '',
+              'Código QR': '',
+            },
+          ],
+        }),
+      })
+          
   if (confirmed) {
     // SOLO ENVÍA EL ID PORQUE EL EXCEL YA TIENE SU NOMBRE Y HORARIO
     const mensajeCorto = `Hola La Cosmina, mi ID de pedido es ${confirmed.orderId}. Solicito mi código de seguridad.`
