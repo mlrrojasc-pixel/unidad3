@@ -18,8 +18,14 @@ import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
 import { useStore } from '@/components/store-provider'
 import { Modal } from '@/components/shared'
-// IMPORTANTE: Asegúrate de instalar npm install react-qr-reader
-import { QrReader } from 'react-qr-reader'
+import dynamic from 'next/dynamic'
+
+// Le decimos a Vercel que NO cargue la cámara en su servidor en la nube, solo en el navegador del cliente
+const QrReader = dynamic(
+  // @ts-ignore
+  () => import('react-qr-reader').then((mod) => mod.QrReader),
+  { ssr: false, loading: () => <p className="text-muted-foreground text-sm p-4 text-center">Iniciando cámara...</p> }
+)
 
 type AppOrder = Order & { pickupTime?: string }
 
@@ -257,7 +263,6 @@ export function PedidosView() {
         </ul>
       </section>
 
-      {/* PANEL DERECHO */}
       <section aria-label="Detalle" className="flex min-h-0 flex-col overflow-y-auto border-t border-border md:border-t-0">
         {selected ? (
           <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
@@ -468,11 +473,6 @@ function QrScannerModal({
     }
   }
 
-  const handleError = (err: any) => {
-    console.error('Error al acceder a la cámara:', err)
-    setError('No se pudo acceder a la cámara. Use el ingreso manual.')
-  }
-
   return (
     <div className="dark">
       <Modal open onClose={onClose} title="Validar Entrega" className="max-w-md bg-card">
@@ -480,12 +480,9 @@ function QrScannerModal({
           
           <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black border border-white/10 flex flex-col items-center justify-center">
              <QrReader
-                onResult={(result, error) => {
+                onResult={(result: any, error: any) => {
                   if (!!result) {
                     handleScan(result?.getText())
-                  }
-                  if (!!error) {
-                    // Ignoramos errores temporales de escaneo
                   }
                 }}
                 constraints={{ facingMode: 'environment' }}
@@ -502,7 +499,7 @@ function QrScannerModal({
              <div className="flex gap-2">
                <input 
                  type="text" 
-                 placeholder="Ingrese ID del pedido (Ej: LC-10500)"
+                 placeholder={`Ingrese: ${orderId}`}
                  value={manualCode}
                  onChange={(e) => {
                    setManualCode(e.target.value.toUpperCase())
