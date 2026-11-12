@@ -11,14 +11,16 @@ import {
   Timer,
   Edit3,
   PackageCheck,
-  AlertTriangle, // NUEVO
+  AlertTriangle,
+  Keyboard
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
 import { useStore } from '@/components/store-provider'
 import { Modal } from '@/components/shared'
+// IMPORTANTE: Asegúrate de instalar npm install react-qr-reader
+import { QrReader } from 'react-qr-reader'
 
-// Hacemos que reconozca el pickupTime
 type AppOrder = Order & { pickupTime?: string }
 
 function useNow() {
@@ -58,7 +60,6 @@ export function PedidosView() {
   const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
   const [substitutionNote, setSubstitutionNote] = useState('')
 
-  // NUEVO: Ordena dando prioridad a los urgentes
   const sorted = [...(orders as AppOrder[])].sort((a, b) => {
     const aUrgent = a.pickupTime === 'Lo antes posible (30 min)'
     const bUrgent = b.pickupTime === 'Lo antes posible (30 min)'
@@ -95,7 +96,6 @@ export function PedidosView() {
   return (
     <div className="grid h-full min-h-0 md:grid-cols-[minmax(300px,390px)_1fr]">
       <section aria-label="Cola de pedidos" className="flex min-h-0 flex-col border-border md:border-r">
-        {/* 3 Pestañas operativas */}
         <div className="grid grid-cols-3 border-b border-border text-center">
           <button
             type="button"
@@ -152,7 +152,6 @@ export function PedidosView() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="font-black">{order.id}</span>
-                          {/* ETIQUETA ROJA DE URGENTE */}
                           {isUrgent && (
                             <span className="flex items-center gap-1 rounded-md bg-destructive/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-destructive">
                               <AlertTriangle className="size-3" /> Urgente
@@ -398,12 +397,18 @@ export function PedidosView() {
                   className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95"
                 >
                   <QrCode className="size-6" />
-                  Escanear QR del Cliente
+                  Escanear QR / Ingreso Manual
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDeliver(selected.id)}
-                  className="flex h-16 items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95"
+                  disabled={!validated[selected.id]}
+                  className={cn(
+                    "flex h-16 items-center justify-center gap-2 rounded-xl text-lg font-black transition-all",
+                    validated[selected.id] 
+                      ? "bg-success text-success-foreground hover:brightness-95" 
+                      : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                  )}
                 >
                   <PackageCheck className="size-6" />
                   2. Confirmar Entrega al Cliente
@@ -422,7 +427,10 @@ export function PedidosView() {
       {scannerOpen && selected && (
         <QrScannerModal
           orderId={selected.id}
-          onValidated={() => setValidated((v) => ({ ...v, [selected.id]: true }))}
+          onValidated={() => {
+            setValidated((v) => ({ ...v, [selected.id]: true }))
+            setScannerOpen(false)
+          }}
           onClose={() => setScannerOpen(false)}
         />
       )}
@@ -439,51 +447,78 @@ function QrScannerModal({
   onValidated: () => void
   onClose: () => void
 }) {
-  const [status, setStatus] = useState<'scanning' | 'ok'>('scanning')
-  const callbacks = useRef({ onValidated, onClose })
-  callbacks.current = { onValidated, onClose }
-  const close = useCallback(() => callbacks.current.onClose(), [])
+  const [manualCode, setManualCode] = useState('')
+  const [error, setError] = useState('')
 
-  useEffect(() => {
-    const scanTimer = setTimeout(() => {
-      setStatus('ok')
-      callbacks.current.onValidated()
-    }, 2000)
-    const closeTimer = setTimeout(() => callbacks.current.onClose(), 3300)
-    return () => {
-      clearTimeout(scanTimer)
-      clearTimeout(closeTimer)
+  const handleManualValidation = () => {
+    if (manualCode.trim() === orderId) {
+      onValidated()
+    } else {
+      setError('Código incorrecto. Intente de nuevo.')
     }
-  }, [])
+  }
+
+  const handleScan = (data: string | null) => {
+    if (data) {
+      if (data === orderId) {
+        onValidated()
+      } else {
+        setError('El código QR escaneado no coincide con el pedido actual.')
+      }
+    }
+  }
+
+  const handleError = (err: any) => {
+    console.error('Error al acceder a la cámara:', err)
+    setError('No se pudo acceder a la cámara. Use el ingreso manual.')
+  }
 
   return (
     <div className="dark">
-      <Modal open onClose={close} title="Escáner QR" className="max-w-sm bg-card">
-        <div className="flex flex-col items-center gap-4 p-6 pt-10">
-          <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black">
-            <div className="absolute inset-6 rounded-xl border-2 border-dashed border-white/20" />
-            {status === 'scanning' ? (
-              <>
-                <QrCode className="absolute left-1/2 top-1/2 size-24 -translate-x-1/2 -translate-y-1/2 text-white/25" />
-                <span className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
-              </>
-            ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-success/90 text-success-foreground">
-                <CheckCircle2 className="size-20" />
-                <p className="mt-2 text-2xl font-black">QR Validado</p>
-              </div>
-            )}
+      <Modal open onClose={onClose} title="Validar Entrega" className="max-w-md bg-card">
+        <div className="flex flex-col gap-6 p-6">
+          
+          <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black border border-white/10 flex flex-col items-center justify-center">
+             <QrReader
+                onResult={(result, error) => {
+                  if (!!result) {
+                    handleScan(result?.getText())
+                  }
+                  if (!!error) {
+                    // Ignoramos errores temporales de escaneo
+                  }
+                }}
+                constraints={{ facingMode: 'environment' }}
+                containerStyle={{ width: '100%', height: '100%' }}
+                videoStyle={{ objectFit: 'cover' }}
+             />
+             <div className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
           </div>
-          <p className="flex items-center gap-2 text-sm text-muted-foreground">
-            {status === 'scanning' ? (
-              <>
-                <ScanLine className="size-4 animate-pulse" />
-                Escaneando código del pedido {orderId}...
-              </>
-            ) : (
-              <span className="font-semibold text-success">Pedido {orderId} verificado para entrega</span>
-            )}
-          </p>
+
+          <div className="space-y-4 border-t border-border pt-6">
+             <p className="text-center text-sm font-bold text-muted-foreground flex items-center justify-center gap-2">
+               <Keyboard className="size-4" /> Validación Alternativa (Ingreso Manual)
+             </p>
+             <div className="flex gap-2">
+               <input 
+                 type="text" 
+                 placeholder="Ingrese ID del pedido (Ej: LC-10500)"
+                 value={manualCode}
+                 onChange={(e) => {
+                   setManualCode(e.target.value.toUpperCase())
+                   setError('')
+                 }}
+                 className="flex-1 rounded-xl border border-input bg-background px-4 text-sm font-bold text-white focus:border-primary focus:outline-none uppercase"
+               />
+               <button 
+                 onClick={handleManualValidation}
+                 className="rounded-xl bg-brand-yellow px-6 font-bold text-brand-yellow-foreground hover:brightness-110 transition-all"
+               >
+                 Validar
+               </button>
+             </div>
+             {error && <p className="text-center text-sm font-bold text-destructive">{error}</p>}
+          </div>
         </div>
       </Modal>
     </div>
