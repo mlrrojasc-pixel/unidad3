@@ -58,6 +58,10 @@ export function CartPage() {
           ],
         }),
       })
+    } catch (error) {
+      console.error('Error al conectar con Excel', error)
+    }
+  }
           
   if (confirmed) {
     // SOLO ENVÍA EL ID PORQUE EL EXCEL YA TIENE SU NOMBRE Y HORARIO
