@@ -98,3 +98,32 @@ export function discountPercent(product: Product) {
   if (!product.oldPrice) return 0
   return Math.round((1 - product.price / product.oldPrice) * 100)
 }
+// --- CÓDIGO DE SINCRONIZACIÓN CON SHEETDB ---
+
+// REEMPLAZA ESTA URL CON TU ENLACE REAL DE SHEETDB
+const sheetdbUrl = 'https://sheetdb.io/api/v1/TU_API_KEY'; 
+
+if (typeof window !== 'undefined') {
+  window.onload = async () => {
+    // Busca el DNI o ID del cliente guardado en este dispositivo
+    const dniCliente = localStorage.getItem('dni_cliente_actual'); 
+    
+    if (dniCliente) {
+      try {
+        console.log("Buscando historial en la base de datos...");
+        // Consulta a SheetDB filtrando por el DNI del cliente
+        const respuesta = await fetch(`${sheetdbUrl}/search?dni=${dniCliente}`);
+        const historial = await respuesta.json();
+        
+        if (historial.length > 0) {
+          console.log("Datos sincronizados:", historial);
+          // Aquí más adelante conectaremos la función para pintar los datos en tu pantalla
+        } else {
+           console.log("El cliente es nuevo o no tiene pedidos previos.");
+        }
+      } catch (error) {
+        console.error("Error al conectar con SheetDB:", error);
+      }
+    }
+  };
+}
