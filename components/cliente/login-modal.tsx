@@ -51,6 +51,7 @@ function LoginForm() {
     e.preventDefault()
     const err = login(email, password)
     if (err) return setError(err)
+    
     showToast('¡Bienvenido de vuelta a La Cosmina!')
     closeAuth()
   }
@@ -110,8 +111,13 @@ function RegisterForm() {
     if (!/^9\d{8}$/.test(form.phone)) return setError('El celular debe tener 9 dígitos y empezar con 9.')
     if (form.password.length < 8) return setError('La contraseña debe tener al menos 8 caracteres.')
     if (!terms) return setError('Debes aceptar los términos y condiciones.')
+    
     const err = register(form)
     if (err) return setError(err)
+    
+    // 👇 ESTA ES LA LÍNEA AGREGADA: Guarda el celular en la memoria del navegador
+    localStorage.setItem('celular_cliente_actual', form.phone)
+
     showToast(`¡Cuenta creada! Hola, ${form.firstName.trim()}`)
     closeAuth()
   }
@@ -169,4 +175,3 @@ function ErrorMsg({ children }: { children: React.ReactNode }) {
     </p>
   )
 }
-
