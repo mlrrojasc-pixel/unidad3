@@ -33,15 +33,17 @@ export function AdminView() {
   const [ticketReplies, setTicketReplies] = useState<Record<string, string>>({})
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
 
-  // CALCULOS Y MÉTRICAS DINÁMICAS (Cosa 6)
   const allOrders = [...orders, ...completedOrders, ...deliveredOrders]
   const totalOrders = allOrders.length || 1
   const totalSales = deliveredOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.qty, 0), 0)
   
-  const substitutionRate = Math.round((allOrders.filter(o => o.substitution).length / totalOrders) * 100)
+  // SOLUCIÓN AL CÁLCULO DE SUSTITUCIÓN (Calcula items agotados vs items totales)
+  const totalItemsSold = allOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.qty, 0), 0) || 1;
+  const totalItemsSubstituted = allOrders.reduce((sum, o) => sum + o.items.filter(i => i.substitute).reduce((s, i) => s + i.qty, 0), 0);
+  const substitutionRate = Math.round((totalItemsSubstituted / totalItemsSold) * 100);
+
   const refundRate = Math.round((complaints.filter(c => c.type === 'Reembolso').length / totalOrders) * 100)
   
-  // Tiempos dinámicos calculados por volumen de items para que se muevan conforme avanzas
   const avgItemsPerOrder = deliveredOrders.length > 0 
     ? deliveredOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.qty, 0), 0) / deliveredOrders.length 
     : 0
@@ -115,14 +117,13 @@ export function AdminView() {
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8">
-          {/* 1. DASHBOARD KPIs (AHORA CON 5 TARJETAS) */}
           {activeTab === 'kpis' && (
             <div className="space-y-6 animate-in fade-in">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                 <MetricCard icon={TrendingUp} title="Ingresos" value={formatPrice(totalSales)} trend="+12.5%" />
                 <MetricCard icon={Clock} title="Empaquetado" value={avgPackStr} />
                 <MetricCard icon={PackageCheck} title="T. Entrega" value={avgDelivStr} />
-                <MetricCard icon={RefreshCw} title="Sustituciones" value={`${substitutionRate}%`} trend={substitutionRate > 20 ? 'Alto' : 'Normal'} />
+                <MetricCard icon={RefreshCw} title="Sustituciones" value={`${substitutionRate}%`} trend={substitutionRate > 20 ? 'Alto' : 'Óptimo'} />
                 <MetricCard icon={Wallet} title="Reembolsos" value={`${refundRate}%`} trend={refundRate > 10 ? 'Atención' : 'Óptimo'} />
               </div>
               <div className="rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
@@ -136,7 +137,6 @@ export function AdminView() {
             </div>
           )}
 
-          {/* 2. GESTIÓN DE RECLAMOS */}
           {activeTab === 'reclamos' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
               {complaints.length === 0 ? (
@@ -163,7 +163,6 @@ export function AdminView() {
                           "{c.detail}"
                         </div>
                         
-                        {/* Evidencia Fotográfica Visual */}
                         <div className="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-white/20 bg-black/40 p-4">
                           {c.image ? (
                             <>
@@ -191,7 +190,6 @@ export function AdminView() {
                           )}
                         </div>
 
-                        {/* Resolución */}
                         {c.resolutionStatus ? (
                           <div className={cn("mt-6 rounded-xl border p-5", c.resolutionStatus === 'Aprobado' ? 'border-success/30 bg-success/10' : 'border-destructive/30 bg-destructive/10')}>
                             <p className={cn("text-xs font-black uppercase tracking-wider flex items-center gap-2", c.resolutionStatus === 'Aprobado' ? 'text-success' : 'text-destructive')}>
@@ -230,7 +228,6 @@ export function AdminView() {
             </div>
           )}
 
-          {/* 3. SOPORTE INTERNO */}
           {activeTab === 'soporte' && (
             <div className="mx-auto max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-4">
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-gradient-to-r from-[#141419] to-[#0a0a0a] p-6 shadow-lg">
@@ -313,7 +310,6 @@ export function AdminView() {
             </div>
           )}
 
-          {/* 4. BASE DE CLIENTES */}
           {activeTab === 'clientes' && (
             <div className="rounded-2xl border border-white/10 bg-[#141419] overflow-hidden shadow-xl animate-in fade-in">
               <div className="bg-black/40 p-4 border-b border-white/10 flex justify-between items-center">
@@ -352,7 +348,6 @@ export function AdminView() {
         </main>
       </div>
 
-      {/* MODAL VISOR DE IMÁGENES */}
       <Modal open={!!selectedImage} onClose={() => setSelectedImage(null)} title="Evidencia del Cliente" className="max-w-3xl bg-[#0f0f13] border border-white/10">
         <div className="p-4 flex flex-col items-center">
           {selectedImage && (
