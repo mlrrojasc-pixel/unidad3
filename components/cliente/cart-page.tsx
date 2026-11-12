@@ -35,18 +35,6 @@ export function CartPage() {
   const procesarYGuardarPedido = async (orden: ConfirmedOrder) => {
     setConfirmed(orden)
 
-    try {
-      await fetch('https://sheetdb.io/api/v1/5f2glnefammpr', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-    } catch (error) {
-      console.error('Error al conectar con Excel', error)
-    }
-  }
-
   if (confirmed) {
     // SOLO ENVÍA EL ID PORQUE EL EXCEL YA TIENE SU NOMBRE Y HORARIO
     const mensajeCorto = `Hola La Cosmina, mi ID de pedido es ${confirmed.orderId}. Solicito mi código de seguridad.`
