@@ -243,4 +243,250 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         return 'Ya existe una cuenta con este correo. Inicia sesión.'
       }
       const account: Account = {
-        firstName:
+        firstName: data.firstName.trim(),
+        lastName: data.lastName.trim(),
+        email,
+        phone: data.phone.trim(),
+        password: data.password.trim(),
+      }
+      setAccounts((prev) => [...prev, account])
+      const { password: _password, ...customer } = account
+      setUser(customer)
+
+      fetch('https://sheetdb.io/api/v1/0793nb34hurdw', {
+        method: 'POST',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: [{
+            'Nombre': account.firstName,
+            'Apellido': account.lastName,
+            'celular': account.phone,
+            'correo electrónico': account.email,
+            'contraseña': account.password,
+          }],
+        }),
+      }).catch(() => {})
+
+      return null
+    },
+    [accounts],
+  )
+
+  const login = useCallback(
+    (email: string, password: string) => {
+      const cleanEmail = email.trim().toLowerCase()
+      const cleanPassword = password.trim()
+      const account = accounts.find((a) => a.email.trim().toLowerCase() === cleanEmail)
+      
+      if (!account) return 'No existe ninguna cuenta registrada con este correo.'
+      if (account.password.trim() !== cleanPassword) return 'Contraseña incorrecta.'
+      
+      const { password: _password, ...customer } = account
+      setUser(customer)
+
+      // 👇 ESTA ES LA LÍNEA AGREGADA: Guarda el celular del cliente que inicia sesión
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('celular_cliente_actual', account.phone)
+      }
+
+      return null
+    },
+    [accounts],
+  )
+
+  const logout = useCallback(() => {
+    setUser(null)
+    // Opcional: Limpiar el celular guardado al cerrar sesión
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('celular_cliente_actual')
+    }
+  }, [])
+
+  const addToCart = useCallback(
+    (id: string) => {
+      const product = products.find((p) => p.id === id)
+      if (!product || !isAvailable(product, sede)) return
+      setCartQty((prev) => ({ ...prev, [id]: Math.min((prev[id] ?? 0) + 1, MAX_QTY) }))
+    },
+    [products, sede],
+  )
+
+  const updateQty = useCallback((id: string, delta: number) => {
+    setCartQty((prev) => {
+      const next = Math.min((prev[id] ?? 0) + delta, MAX_QTY)
+      const copy = { ...prev }
+      if (next <= 0) delete copy[id]
+      else copy[id] = next
+      return copy
+    })
+  }, [])
+
+  const clearCart = useCallback(() => setCartQty({}), [])
+
+  const cart = useMemo<CartLine[]>(
+    () =>
+      Object.entries(cartQty)
+        .map(([id, qty]) => {
+          const product = products.find((p) => p.id === id)!
+          return { product, qty, available: product ? isAvailable(product, sede) : false }
+        })
+        .filter((line) => line.product),
+    [cartQty, products, sede],
+  )
+
+  const cartCount = cart.reduce((sum, l) => sum + l.qty, 0)
+  const cartTotal = cart.reduce((sum, l) => sum + l.qty * l.product.price, 0)
+  const unavailableCount = cart.filter((l) => !l.available).length
+  const qtyInCart = useCallback((id: string) => cartQty[id] ?? 0, [cartQty])
+
+  const completeOrder = useCallback(
+    (id: string, substitutionNote?: string) => {
+      setOrders((prev) => {
+        const orderToComplete = prev.find((o) => o.id === id)
+        if (orderToComplete) {
+          const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+          setCompletedOrders((cPrev) => [
+            { ...orderToComplete, substitutionNote, readyAt: nowStr },
+            ...cPrev.filter((item) => item.id !== id),
+          ])
+        }
+        return prev.filter((o) => o.id !== id)
+      })
+      setReadyCount((n) => n + 1)
+      showToast(`Pedido ${id} listo para recojo`)
+
+      fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+        method: 'PATCH',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { 'Estado': 'Listo para recoger' } })
+      }).catch(() => {})
+    },
+    [showToast],
+  )
+
+  const deliverOrder = useCallback(
+    (id: string) => {
+      setCompletedOrders((prev) => {
+        const orderToDeliver = prev.find((o) => o.id === id)
+        if (orderToDeliver) {
+          const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+          setDeliveredOrders((dPrev) => [
+            { ...orderToDeliver, deliveredAt: nowStr },
+            ...dPrev.filter((item) => item.id !== id),
+          ])
+        }
+        return prev.filter((o) => o.id !== id)
+      })
+      showToast(`Pedido ${id} entregado al cliente`)
+
+      fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+        method: 'PATCH',
+        headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data: { 'Estado': 'Entregado' } })
+      }).catch(() => {})
+    },
+    [showToast],
+  )
+
+  const addComplaint = useCallback(
+    (data: Omit<Complaint, 'id' | 'createdAt'>) => {
+      const newComplaint: Complaint = {
+        ...data,
+        id: `REC-${Math.floor(1000 + Math.random() * 9000)}`,
+        createdAt: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
+      }
+      setComplaints((prev) => [newComplaint, ...prev])
+      showToast('Reclamo registrado exitosamente')
+    },
+    [showToast],
+  )
+
+  const resolveComplaint = useCallback((id: string, status: 'Aprobado' | 'Rechazado', text: string) => {
+    setComplaints((prev) => {
+      const next = prev.map((c) => (c.id === id ? { ...c, resolutionStatus: status, resolutionText: text } : c));
+      const target = next.find(c => c.id === id);
+      
+      if (target && target.orderId) {
+        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${target.orderId}`, {
+          method: 'PATCH',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            data: { 'Reembolso': status === 'Aprobado' ? 'Reembolso procesado' : 'Rechazado' }
+          })
+        }).catch(() => {})
+      }
+      return next;
+    })
+    showToast(`Reclamo ${id} marcado como ${status}`)
+  }, [showToast])
+
+  const addTicket = useCallback((topic: string, detail: string, urgent: boolean) => {
+    const newTicket: SupportTicket = {
+      id: `T-${Math.floor(100 + Math.random() * 900)}`,
+      topic,
+      detail,
+      status: 'Abierto',
+      urgent,
+      createdAt: new Date().toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' }),
+    }
+    setTickets((prev) => [newTicket, ...prev])
+    showToast('Ticket de soporte enviado')
+  }, [showToast])
+
+  const resolveTicket = useCallback((id: string, status: 'En revisión' | 'Resuelto', text?: string) => {
+    setTickets((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, status, resolutionText: text } : t))
+    )
+    showToast(`Ticket ${id} actualizado a ${status}`)
+  }, [showToast])
+
+  const placeOrder = useCallback(
+    (payment: PaymentMethod, substitution: boolean, pickupTime: string): PlaceOrderResult => {
+      if (!user) return { ok: false, reason: 'auth' }
+      if (cart.length === 0) return { ok: false, reason: 'empty' }
+      const substituted = cart.filter((l) => !l.available).length
+      if (substituted > 0 && !substitution) return { ok: false, reason: 'substitution' }
+      const customer = `${user.firstName} ${user.lastName}`
+      const id = `LC-${Math.floor(10500 + Math.random() * 8999)}`
+      const slaSeconds = 30 * 60
+      setOrders((prev) => [
+        ...prev,
+        {
+          id,
+          customer,
+          sede,
+          payment,
+          pickupTime,
+          slaSeconds,
+          deadline: Date.now() + slaSeconds * 1000,
+          substitution,
+          items: cart.map((l) => ({
+            name: `${l.product.name} ${l.product.brand}`,
+            qty: l.qty,
+            price: l.product.price,
+            substitute: !l.available,
+          })),
+        },
+      ])
+      setCartQty({})
+      return { ok: true, orderId: id, customer, total: cartTotal, substituted }
+    },
+    [cart, cartTotal, sede, user],
+  )
+
+  const value: StoreContextValue = {
+    startShift, products, setStock, setStockAllSedes, user, register, login, logout, authMode, openAuth,
+    closeAuth, unavailableCount, cart, cartCount, cartTotal, qtyInCart, addToCart, updateQty, clearCart,
+    search, setSearch, category, setCategory, sede, setSede, orders, completedOrders, deliveredOrders,
+    complaints, tickets, readyCount, completeOrder, deliverOrder, addComplaint, resolveComplaint, addTicket,
+    resolveTicket, placeOrder, toast, showToast,
+  }
+
+  return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>
+}
+
+export function useStore() {
+  const ctx = useContext(StoreContext)
+  if (!ctx) throw new Error('useStore debe usarse dentro de StoreProvider')
+  return ctx
+}
