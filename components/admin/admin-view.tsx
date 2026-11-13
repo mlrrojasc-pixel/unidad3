@@ -149,6 +149,7 @@ export function AdminView() {
                 <div className="grid gap-6 xl:grid-cols-2">
                   {complaints.map((c) => {
                     const relatedOrder = allOrders.find(o => o.id === c.orderId);
+                    // LEYENDO LA EVIDENCIA DE CLOUDINARY
                     const employeeEvidence = relatedOrder?.evidencePhoto || null;
 
                     return (
@@ -167,7 +168,6 @@ export function AdminView() {
                             "{c.detail}"
                           </div>
                           
-                          {/* COMPARACIÓN DE EVIDENCIAS: CLIENTE VS EMPLEADO */}
                           <div className="mt-4 grid grid-cols-2 gap-4">
                             {/* Evidencia del Cliente */}
                             <div className="flex flex-col gap-2 rounded-xl border border-dashed border-white/20 bg-black/40 p-3">
@@ -190,7 +190,7 @@ export function AdminView() {
                               )}
                             </div>
 
-                            {/* Evidencia del Empleado */}
+                            {/* Evidencia del Empleado (Cloudinary) */}
                             <div className="flex flex-col gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
                               <p className="text-[10px] font-bold uppercase text-primary">Control de Tienda</p>
                               {employeeEvidence ? (
