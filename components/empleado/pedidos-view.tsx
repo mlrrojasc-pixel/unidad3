@@ -1,30 +1,19 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Check,
   CheckCircle2,
   Inbox,
-  QrCode,
   RefreshCw,
-  ScanLine,
   Timer,
   Edit3,
   PackageCheck,
   AlertTriangle,
-  Keyboard
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
 import { useStore } from '@/components/store-provider'
-import { Modal } from '@/components/shared'
-import dynamic from 'next/dynamic'
-
-const QrReader = dynamic(
-  // @ts-ignore
-  () => import('react-qr-reader').then((mod) => mod.QrReader),
-  { ssr: false, loading: () => <p className="text-muted-foreground text-sm p-4 text-center">Iniciando cámara...</p> }
-)
 
 type AppOrder = Order & { pickupTime?: string; securityCode?: string }
 
@@ -58,8 +47,6 @@ export function PedidosView() {
   const { orders, completedOrders, deliveredOrders, completeOrder, deliverOrder } = useStore()
   const now = useNow()
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [scannerOpen, setScannerOpen] = useState(false)
-  const [validated, setValidated] = useState<Record<string, boolean>>({})
   const [picked, setPicked] = useState<Record<string, boolean>>({})
 
   const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
@@ -240,7 +227,7 @@ export function PedidosView() {
                         <span className="font-black">{order.id}</span>
                         <span className="flex items-center gap-1 text-xs font-bold text-success">
                           <PackageCheck className="size-4" />
-                          Entregado a las {order.deliveredAt ? order.deliveredAt : ''}
+                          Entregado {order.deliveredAt ? `a las ${order.deliveredAt}` : ''}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
@@ -302,12 +289,6 @@ export function PedidosView() {
                 <span className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-semibold">
                   <RefreshCw className="size-3.5" />
                   Acepta sustitución
-                </span>
-              )}
-              {(validated[selected.id] || activeTab === 'entregados') && (
-                <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
-                  <CheckCircle2 className="size-3.5" />
-                  QR validado
                 </span>
               )}
             </div>
@@ -394,25 +375,11 @@ export function PedidosView() {
             )}
 
             {activeTab === 'listos' && (
-              <div className="mt-auto grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setScannerOpen(true)}
-                  className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95"
-                >
-                  <QrCode className="size-6" />
-                  Escanear / Ingresar Código
-                </button>
+              <div className="mt-auto">
                 <button
                   type="button"
                   onClick={() => handleDeliver(selected.id)}
-                  disabled={!validated[selected.id]}
-                  className={cn(
-                    "flex h-16 items-center justify-center gap-2 rounded-xl text-lg font-black transition-all",
-                    validated[selected.id] 
-                      ? "bg-success text-success-foreground hover:brightness-95" 
-                      : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                  )}
+                  className="flex h-16 w-full items-center justify-center gap-2 rounded-xl bg-primary text-lg font-black text-primary-foreground hover:brightness-110 transition-all shadow-lg"
                 >
                   <PackageCheck className="size-6" />
                   2. Confirmar Entrega
@@ -427,105 +394,6 @@ export function PedidosView() {
           </div>
         )}
       </section>
-
-      {scannerOpen && selected && (
-        <QrScannerModal
-          orderId={selected.id}
-          securityCode={selected.securityCode || ''}
-          onValidated={() => {
-            setValidated((v) => ({ ...v, [selected.id]: true }))
-            setScannerOpen(false)
-          }}
-          onClose={() => setScannerOpen(false)}
-        />
-      )}
-    </div>
-  )
-}
-
-function QrScannerModal({
-  orderId,
-  securityCode,
-  onValidated,
-  onClose,
-}: {
-  orderId: string
-  securityCode: string
-  onValidated: () => void
-  onClose: () => void
-}) {
-  // SOLUCIÓN AL TECLADO: Input no controlado que no fuerza a la pantalla a recargarse mientras escribes
-  const inputRef = useRef<HTMLInputElement>(null)
-  const [error, setError] = useState('')
-
-  const handleManualValidation = () => {
-    const manualCode = inputRef.current?.value.trim() || ''
-    
-    if (securityCode === '') {
-      setError('Aún no hay código en el Excel. Vuelva a intentar.')
-      return
-    }
-    
-    if (manualCode === securityCode) {
-      onValidated()
-    } else {
-      setError('Código incorrecto. Verifique los 4 dígitos del cliente.')
-    }
-  }
-
-  const handleScan = (data: string | null) => {
-    if (data) {
-      if (securityCode !== '' && data === securityCode.trim()) {
-        onValidated()
-      } else {
-        setError('El código QR escaneado no es válido para este pedido.')
-      }
-    }
-  }
-
-  return (
-    <div className="dark">
-      <Modal open onClose={onClose} title="Validar Entrega" className="max-w-md bg-card">
-        <div className="flex flex-col gap-6 p-6">
-          
-          <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black border border-white/10 flex flex-col items-center justify-center">
-             <QrReader
-                onResult={(result: any) => {
-                  if (!!result) {
-                    handleScan(result?.getText())
-                  }
-                }}
-                constraints={{ facingMode: 'environment' }}
-                containerStyle={{ width: '100%', height: '100%' }}
-                videoStyle={{ objectFit: 'cover' }}
-             />
-             <div className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
-          </div>
-
-          <div className="space-y-4 border-t border-border pt-6">
-             <p className="text-center text-sm font-bold text-muted-foreground flex items-center justify-center gap-2">
-               <Keyboard className="size-4" /> Validación Alternativa (Código Typebot)
-             </p>
-             <div className="flex gap-2">
-               <input 
-                 ref={inputRef}
-                 type="number" 
-                 placeholder="Ej: 1234"
-                 maxLength={4}
-                 onChange={() => setError('')}
-                 className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-2xl tracking-widest font-black text-white focus:border-primary focus:outline-none"
-               />
-               <button 
-                 onClick={handleManualValidation}
-                 className="rounded-xl bg-brand-yellow px-6 font-bold text-brand-yellow-foreground hover:brightness-110 transition-all"
-               >
-                 Validar
-               </button>
-             </div>
-             {error && <p className="text-center text-sm font-bold text-destructive">{error}</p>}
-          </div>
-        </div>
-      </Modal>
     </div>
   )
 }
