@@ -14,7 +14,8 @@ import {
 
 export type PaymentMethod = Order['payment']
 
-export type AppOrder = Order & { pickupTime?: string }
+// NUEVO: Agregamos securityCode a la interfaz
+export type AppOrder = Order & { pickupTime?: string; securityCode?: string }
 
 export interface CartLine {
   product: Product
@@ -157,7 +158,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [authMode, setAuthMode] = useState<AuthMode | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Carga inicial de datos de usuarios
   useEffect(() => {
     setCartQty(getLocalData('lacosmina_cart', {}))
     setSede(getLocalData('lacosmina_sede', SEDES[0]))
@@ -192,7 +192,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       .catch(error => console.error('Error al sincronizar cuentas:', error))
   }, [])
 
-  // NUEVO: Sincronizar historial de pedidos del cliente al iniciar sesión
   useEffect(() => {
     if (user && user.phone) {
       fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/search?Celular=${user.phone}`)
@@ -209,7 +208,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                 itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : [] 
               } catch(e) {}
 
-              const baseOrder = {
+              // NUEVO: Agregamos el securityCode leyendo "Código QR"
+              const baseOrder: AppOrder = {
                 id: fila['ID de Pedido'],
                 customer: fila['Cliente'],
                 sede: SEDES[0],
@@ -219,10 +219,12 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                 deadline: Date.now() + 1800000,
                 substitution: fila['Sustitución'] !== 'Ninguna',
                 items: itemsParsed,
+                securityCode: fila['Código QR'] || '', 
               }
 
               if (fila['Estado'] === 'Entregado') {
-                entregados.push({ ...baseOrder, deliveredAt: 'Entregado' } as CompletedOrder)
+                // NUEVO: Extraemos la hora real para evitar "Entregado Entregado"
+                entregados.push({ ...baseOrder, deliveredAt: fila['Hora de Entrega'] || '' } as CompletedOrder)
               } else if (fila['Estado'] === 'Listo para recoger') {
                 completados.push({ ...baseOrder, readyAt: 'Listo' } as CompletedOrder)
               } else {
@@ -380,18 +382,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCompletedOrders((prev) => {
       const orderToDeliver = prev.find((o) => o.id === id)
       if (orderToDeliver) {
-        const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
+        // NUEVO: Calculamos la hora exacta de la entrega
+        const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
+        
         setDeliveredOrders((dPrev) => [{ ...orderToDeliver, deliveredAt: nowStr }, ...dPrev.filter((item) => item.id !== id)])
+        
+        // Enviamos la hora exacta a SheetDB para que quede registrada
+        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+          method: 'PATCH',
+          headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ data: { 'Estado': 'Entregado', 'Hora de Entrega': nowStr } })
+        }).catch(() => {})
       }
       return prev.filter((o) => o.id !== id)
     })
     showToast(`Pedido ${id} entregado al cliente`)
-
-    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
-      method: 'PATCH',
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: { 'Estado': 'Entregado' } })
-    }).catch(() => {})
   }, [showToast])
 
   const addComplaint = useCallback((data: Omit<Complaint, 'id' | 'createdAt'>) => {
@@ -439,7 +444,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     showToast(`Ticket ${id} actualizado a ${status}`)
   }, [showToast])
 
-  // NUEVO: Enviar toda la información del pedido a SheetDB
   const placeOrder = useCallback((payment: PaymentMethod, substitution: boolean, pickupTime: string): PlaceOrderResult => {
     if (!user) return { ok: false, reason: 'auth' }
     if (cart.length === 0) return { ok: false, reason: 'empty' }
@@ -479,7 +483,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           'Estado': 'Compra confirmada',
           'Sustitución': substitution ? 'Sí' : 'Ninguna',
           'Reembolso': '-',
-          'Detalle': JSON.stringify(itemsToSave)
+          'Detalle': JSON.stringify(itemsToSave),
+          'Hora de Entrega': '',
         }]
       })
     }).catch(console.error)
