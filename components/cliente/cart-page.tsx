@@ -19,11 +19,15 @@ import {
   ImageIcon,
   UserRound,
   ShieldAlert,
+  CalendarDays,
+  Snowflake,
+  X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, sedeShort } from '@/lib/store-data'
 import { useStore, type Complaint } from '@/components/store-provider'
 import { PaymentSection, type ConfirmedOrder } from '@/components/cliente/payment-section'
+import { Modal } from '@/components/shared'
 
 const NUMERO_WHATSAPP = '51904827537'
 
@@ -32,8 +36,6 @@ export function CartPage() {
   const [confirmed, setConfirmed] = useState<ConfirmedOrder | null>(null)
 
   const procesarYGuardarPedido = async (orden: ConfirmedOrder) => {
-    // SOLUCIÓN AL DUPLICADO: Eliminamos el fetch a SheetDB aquí. 
-    // store-provider.tsx ya se encarga de enviarlo completo.
     setConfirmed(orden)
   }
           
@@ -243,12 +245,17 @@ export function CartPage() {
 }
 
 function CustomerOrdersAndComplaints() {
-  const { user, orders, completedOrders, deliveredOrders, addComplaint, complaints, openAuth } = useStore()
+  const { user, orders, completedOrders, deliveredOrders, addComplaint, complaints, openAuth, showToast } = useStore()
   const [complaintOrderId, setComplaintOrderId] = useState('')
   const [complaintType, setComplaintType] = useState<Complaint['type']>('Reembolso')
   const [complaintDetail, setComplaintDetail] = useState('')
   const [complaintImage, setComplaintImage] = useState<string>('')
   const [sentSuccess, setSentSuccess] = useState(false)
+
+  // ESTADOS PARA REPROGRAMACIÓN DE HORARIO
+  const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
+  const [orderToReschedule, setOrderToReschedule] = useState<any>(null)
+  const [newTime, setNewTime] = useState('')
 
   const allOrders = [
     ...orders.map((o) => ({ ...o, statusLabel: 'En preparación en tienda', statusTone: 'bg-brand-yellow/20 text-foreground', substitutionNote: undefined })),
@@ -289,6 +296,37 @@ function CustomerOrdersAndComplaints() {
     setTimeout(() => setSentSuccess(false), 4000)
   }
 
+  const openRescheduleModal = (order: any) => {
+    setOrderToReschedule(order)
+    setIsRescheduleModalOpen(true)
+    setNewTime('')
+  }
+
+  const submitReschedule = async () => {
+    if (!orderToReschedule || !newTime) return;
+
+    try {
+      await fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${orderToReschedule.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          data: {
+            'Horario de Recojo': newTime
+          }
+        })
+      });
+      showToast(`El pedido ${orderToReschedule.id} fue reprogramado con éxito.`);
+      setIsRescheduleModalOpen(false);
+      // Opcional: Podrías forzar una recarga aquí o esperar a que la sesión actualice.
+    } catch (error) {
+      console.error('Error reprogramando', error);
+      showToast('Error al conectar con la base de datos.');
+    }
+  }
+
   const wspQuejaMsg = `Hola La Cosmina, deseo presentar un reclamo / solicitar reembolso sobre mi pedido ${complaintOrderId || myOrders[0]?.id || ''}.`
   const wspQuejaUrl = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(wspQuejaMsg)}`
 
@@ -315,31 +353,56 @@ function CustomerOrdersAndComplaints() {
           </div>
         ) : (
           <ul className="mt-4 space-y-3">
-            {myOrders.map((o) => (
-              <li key={o.id} className="rounded-xl border border-border p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <span className="text-lg font-black text-primary">{o.id}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">· {o.sede}</span>
+            {myOrders.map((o) => {
+              // Verificamos si hay productos congelados en el pedido (Por simplicidad en el prototipo, buscamos palabras clave)
+              const hasFrozenItems = o.items.some((item: any) => 
+                item.name.toLowerCase().includes('congelado') || 
+                item.name.toLowerCase().includes('helado') ||
+                item.name.toLowerCase().includes('hielo') ||
+                item.name.toLowerCase().includes('carne')
+              );
+
+              return (
+                <li key={o.id} className="rounded-xl border border-border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="text-lg font-black text-primary">{o.id}</span>
+                      <span className="ml-2 text-xs text-muted-foreground">· {o.sede}</span>
+                    </div>
+                    <span className={cn('rounded-full px-3 py-1 text-xs font-bold', o.statusTone)}>
+                      {o.statusLabel}
+                    </span>
                   </div>
-                  <span className={cn('rounded-full px-3 py-1 text-xs font-bold', o.statusTone)}>
-                    {o.statusLabel}
-                  </span>
-                </div>
-                <ul className="mt-2 space-y-1 text-xs text-muted-foreground">
-                  {o.items.map((item, idx) => (
-                    <li key={idx}>
-                      {item.qty}x {item.name} — {formatPrice(item.price * item.qty)}
-                    </li>
-                  ))}
-                </ul>
-                {o.substitutionNote && (
-                  <p className="mt-2 rounded-lg bg-brand-yellow/15 px-3 py-1.5 text-xs font-medium">
-                    <strong>Sustitución realizada:</strong> {o.substitutionNote}
-                  </p>
-                )}
-              </li>
-            ))}
+                  
+                  <div className="mt-2 mb-3 flex items-center justify-between border-b border-border pb-3">
+                    <p className="text-sm font-semibold text-foreground">
+                      Horario actual: <span className="text-primary">{o.pickupTime || 'No especificado'}</span>
+                    </p>
+                    {o.statusLabel === 'En preparación en tienda' && (
+                      <button 
+                        onClick={() => openRescheduleModal({ ...o, hasFrozenItems })}
+                        className="flex items-center gap-1.5 rounded-lg border border-border bg-background px-3 py-1.5 text-xs font-bold text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+                      >
+                        <CalendarDays className="size-3.5" /> Reprogramar
+                      </button>
+                    )}
+                  </div>
+
+                  <ul className="space-y-1 text-xs text-muted-foreground">
+                    {o.items.map((item: any, idx: number) => (
+                      <li key={idx}>
+                        {item.qty}x {item.name} — {formatPrice(item.price * item.qty)}
+                      </li>
+                    ))}
+                  </ul>
+                  {o.substitutionNote && (
+                    <p className="mt-2 rounded-lg bg-brand-yellow/15 px-3 py-1.5 text-xs font-medium">
+                      <strong>Sustitución realizada:</strong> {o.substitutionNote}
+                    </p>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>
@@ -490,6 +553,86 @@ function CustomerOrdersAndComplaints() {
           </div>
         )}
       </section>
+
+      {/* MODAL DE REPROGRAMACIÓN */}
+      {isRescheduleModalOpen && orderToReschedule && (
+        <Modal 
+          open={isRescheduleModalOpen} 
+          onClose={() => setIsRescheduleModalOpen(false)} 
+          title={`Reprogramar Pedido ${orderToReschedule.id}`}
+          className="max-w-md bg-card"
+        >
+          <div className="p-6">
+            <p className="mb-4 text-sm text-muted-foreground">
+              Seleccione el nuevo horario en el que desea recoger su pedido. 
+              <br/>Horario original: <strong>{orderToReschedule.pickupTime}</strong>
+            </p>
+
+            {orderToReschedule.hasFrozenItems && (
+              <div className="mb-5 rounded-xl border border-destructive/50 bg-destructive/10 p-4">
+                <p className="flex items-center gap-2 text-sm font-black text-destructive">
+                  <Snowflake className="size-5" /> ¡Atención! Contiene productos congelados
+                </p>
+                <p className="mt-1 text-xs font-medium text-destructive-foreground">
+                  Su pedido contiene alimentos perecibles (carnes, helados). Al retrasar su recojo, nuestro personal deberá retornar sus productos a las cámaras frigoríficas. Asegúrese de llegar en su nuevo horario para no perder la cadena de frío.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <label className="flex cursor-pointer items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted">
+                <span className="text-sm font-bold">Mañana (08:00 - 12:00)</span>
+                <input 
+                  type="radio" 
+                  name="schedule" 
+                  value="Mañana (08:00 - 12:00)"
+                  checked={newTime === "Mañana (08:00 - 12:00)"}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="size-4 accent-primary" 
+                />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted">
+                <span className="text-sm font-bold">Tarde (13:00 - 17:00)</span>
+                <input 
+                  type="radio" 
+                  name="schedule" 
+                  value="Tarde (13:00 - 17:00)"
+                  checked={newTime === "Tarde (13:00 - 17:00)"}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="size-4 accent-primary" 
+                />
+              </label>
+              <label className="flex cursor-pointer items-center justify-between rounded-lg border border-border p-3 transition-colors hover:bg-muted">
+                <span className="text-sm font-bold">Noche (18:00 - 22:00)</span>
+                <input 
+                  type="radio" 
+                  name="schedule" 
+                  value="Noche (18:00 - 22:00)"
+                  checked={newTime === "Noche (18:00 - 22:00)"}
+                  onChange={(e) => setNewTime(e.target.value)}
+                  className="size-4 accent-primary" 
+                />
+              </label>
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button 
+                onClick={() => setIsRescheduleModalOpen(false)}
+                className="flex-1 rounded-xl border border-border bg-transparent py-3 text-sm font-bold text-foreground hover:bg-muted"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={submitReschedule}
+                disabled={!newTime || newTime === orderToReschedule.pickupTime}
+                className="flex-1 rounded-xl bg-primary py-3 text-sm font-bold text-primary-foreground disabled:opacity-50"
+              >
+                Confirmar Horario
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }
