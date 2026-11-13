@@ -160,7 +160,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setAccounts(cuentasLocales)
     setHydrated(true)
 
-    fetch(`https://sheetdb.io/api/v1/0793nb34hurdw?nocache=${Date.now()}`, { cache: 'no-store' })
+    // NUEVO LINK CUENTAS: zl6r1yt4h5voo
+    fetch(`https://sheetdb.io/api/v1/zl6r1yt4h5voo?nocache=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -179,8 +180,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   // VISTA GLOBAL: Cargamos todos los pedidos
   useEffect(() => {
-    // 1. SOLUCIÓN AL CACHÉ: Añadimos nocache y cache: 'no-store'
-    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr?nocache=${Date.now()}`, { cache: 'no-store' })
+    // NUEVO LINK PEDIDOS: k78fylj6v3892
+    fetch(`https://sheetdb.io/api/v1/k78fylj6v3892?nocache=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -194,7 +195,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             try { itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : []; } catch(e) {}
             if (orderMap.has(id) && itemsParsed.length === 0) return;
 
-            // 2. SOLUCIÓN A LA COLUMNA OCULTA: Buscamos la columna de QR dinámicamente por si tiene saltos de línea
             const filaKeys = Object.keys(fila);
             const qrKey = filaKeys.find(k => k.toLowerCase().includes('qr')) || 'Código QR';
             const evidenciaKey = filaKeys.find(k => k.toLowerCase().includes('evidencia')) || 'Evidencia';
@@ -291,7 +291,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const { password: _password, ...customer } = account
     setUser(customer)
 
-    fetch('https://sheetdb.io/api/v1/0793nb34hurdw', {
+    fetch('https://sheetdb.io/api/v1/zl6r1yt4h5voo', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -365,7 +365,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCompletedOrders(updatePhoto)
     setDeliveredOrders(updatePhoto)
 
-    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+    fetch(`https://sheetdb.io/api/v1/k78fylj6v3892/ID%20de%20Pedido/${id}`, {
       method: 'PATCH',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: { 'Evidencia': url } })
@@ -386,7 +386,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     if (photoUrl && typeof window !== 'undefined') window.localStorage.setItem(`evidencia_${id}`, photoUrl);
 
-    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+    fetch(`https://sheetdb.io/api/v1/k78fylj6v3892/ID%20de%20Pedido/${id}`, {
       method: 'PATCH',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: { 'Estado': 'Listo para recoger', 'Evidencia': photoUrl || '' } })
@@ -400,7 +400,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
         setDeliveredOrders((dPrev) => [{ ...orderToDeliver, deliveredAt: nowStr }, ...dPrev.filter((item) => item.id !== id)])
         
-        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+        fetch(`https://sheetdb.io/api/v1/k78fylj6v3892/ID%20de%20Pedido/${id}`, {
           method: 'PATCH',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: { 'Estado': 'Entregado', 'Hora de Entrega': nowStr } })
@@ -427,7 +427,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const target = next.find(c => c.id === id);
       
       if (target && target.orderId) {
-        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${target.orderId}`, {
+        fetch(`https://sheetdb.io/api/v1/k78fylj6v3892/ID%20de%20Pedido/${target.orderId}`, {
           method: 'PATCH',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: { 'Reembolso': status === 'Aprobado' ? 'Reembolso procesado' : 'Rechazado' } })
@@ -483,7 +483,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setOrders((prev) => [...prev, newOrder])
     setCartQty({})
 
-    fetch('https://sheetdb.io/api/v1/5f2glnefammpr', {
+    fetch('https://sheetdb.io/api/v1/k78fylj6v3892', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({
