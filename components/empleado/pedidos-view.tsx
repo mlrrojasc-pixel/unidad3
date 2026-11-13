@@ -20,14 +20,14 @@ import { useStore } from '@/components/store-provider'
 import { Modal } from '@/components/shared'
 import dynamic from 'next/dynamic'
 
-// Le decimos a Vercel que NO cargue la cámara en su servidor en la nube, solo en el navegador del cliente
 const QrReader = dynamic(
   // @ts-ignore
   () => import('react-qr-reader').then((mod) => mod.QrReader),
   { ssr: false, loading: () => <p className="text-muted-foreground text-sm p-4 text-center">Iniciando cámara...</p> }
 )
 
-type AppOrder = Order & { pickupTime?: string }
+// Añadimos securityCode para que Typescript lo reconozca
+type AppOrder = Order & { pickupTime?: string; securityCode?: string }
 
 function useNow() {
   const [now, setNow] = useState(() => Date.now())
@@ -241,7 +241,8 @@ export function PedidosView() {
                         <span className="font-black">{order.id}</span>
                         <span className="flex items-center gap-1 text-xs font-bold text-success">
                           <PackageCheck className="size-4" />
-                          Entregado {order.deliveredAt ?? ''}
+                          {/* SOLUCIÓN AL ENTREGADO ENTREGADO: */}
+                          Entregado {order.deliveredAt ? order.deliveredAt : ''}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
@@ -402,7 +403,7 @@ export function PedidosView() {
                   className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95"
                 >
                   <QrCode className="size-6" />
-                  Escanear QR / Ingreso Manual
+                  Escanear / Ingreso Manual
                 </button>
                 <button
                   type="button"
@@ -416,7 +417,7 @@ export function PedidosView() {
                   )}
                 >
                   <PackageCheck className="size-6" />
-                  2. Confirmar Entrega al Cliente
+                  2. Confirmar Entrega
                 </button>
               </div>
             )}
@@ -432,6 +433,7 @@ export function PedidosView() {
       {scannerOpen && selected && (
         <QrScannerModal
           orderId={selected.id}
+          securityCode={selected.securityCode || ''}
           onValidated={() => {
             setValidated((v) => ({ ...v, [selected.id]: true }))
             setScannerOpen(false)
@@ -445,10 +447,12 @@ export function PedidosView() {
 
 function QrScannerModal({
   orderId,
+  securityCode,
   onValidated,
   onClose,
 }: {
   orderId: string
+  securityCode: string
   onValidated: () => void
   onClose: () => void
 }) {
@@ -456,19 +460,24 @@ function QrScannerModal({
   const [error, setError] = useState('')
 
   const handleManualValidation = () => {
-    if (manualCode.trim() === orderId) {
+    if (securityCode === '') {
+      setError('Aún no hay código en el Excel. Vuelva a intentar.')
+      return
+    }
+    // SOLUCIÓN A CÓDIGO TYPEBOT: Validamos con los 4 dígitos
+    if (manualCode.trim() === securityCode.trim()) {
       onValidated()
     } else {
-      setError('Código incorrecto. Intente de nuevo.')
+      setError('Código incorrecto. Verifique los 4 dígitos del cliente.')
     }
   }
 
   const handleScan = (data: string | null) => {
     if (data) {
-      if (data === orderId) {
+      if (securityCode !== '' && data === securityCode.trim()) {
         onValidated()
       } else {
-        setError('El código QR escaneado no coincide con el pedido actual.')
+        setError('El código QR escaneado no es válido para este pedido.')
       }
     }
   }
@@ -494,18 +503,19 @@ function QrScannerModal({
 
           <div className="space-y-4 border-t border-border pt-6">
              <p className="text-center text-sm font-bold text-muted-foreground flex items-center justify-center gap-2">
-               <Keyboard className="size-4" /> Validación Alternativa (Ingreso Manual)
+               <Keyboard className="size-4" /> Validación Alternativa (Código Typebot)
              </p>
              <div className="flex gap-2">
                <input 
                  type="text" 
-                 placeholder={`Ingrese: ${orderId}`}
+                 placeholder="Ej: 1234"
+                 maxLength={4}
                  value={manualCode}
                  onChange={(e) => {
-                   setManualCode(e.target.value.toUpperCase())
+                   setManualCode(e.target.value)
                    setError('')
                  }}
-                 className="flex-1 rounded-xl border border-input bg-background px-4 text-sm font-bold text-white focus:border-primary focus:outline-none uppercase"
+                 className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-2xl tracking-widest font-black text-white focus:border-primary focus:outline-none"
                />
                <button 
                  onClick={handleManualValidation}
