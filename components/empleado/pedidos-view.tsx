@@ -558,7 +558,7 @@ export function PedidosView() {
   )
 }
 
-function QrScannerModal({
+function ValidationModal({
   orderId,
   securityCode,
   onValidated,
@@ -569,89 +569,56 @@ function QrScannerModal({
   onValidated: () => void
   onClose: () => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [manualCode, setManualCode] = useState('')
   const [error, setError] = useState('')
 
-  const handleManualValidation = () => {
-    const manualCode = (inputRef.current?.value || '').replace(/[^0-9]/g, '')
+  const handleValidation = () => {
     const cleanTarget = (securityCode || '').replace(/[^0-9]/g, '')
+    const cleanInput = manualCode.replace(/[^0-9]/g, '')
     
     if (!cleanTarget) {
       setError('Aún no hay código en el Excel. Vuelva a intentar.')
       return
     }
     
-    if (manualCode === cleanTarget) {
+    if (cleanInput === cleanTarget) {
       onValidated()
     } else {
       setError('Código incorrecto. Verifique los 4 dígitos del cliente.')
     }
   }
 
-  const handleScan = (data: string | null) => {
-    if (data) {
-      const cleanData = data.replace(/[^0-9]/g, '')
-      const cleanTarget = (securityCode || '').replace(/[^0-9]/g, '')
-      if (cleanTarget !== '' && cleanData.includes(cleanTarget)) {
-        onValidated()
-      } else {
-        setError('El código QR escaneado no es válido para este pedido.')
-      }
-    }
-  }
-
   return (
-    <div className="dark">
-      <Modal open onClose={onClose} title="Validar Entrega" className="max-w-md bg-card">
-        <div className="flex flex-col gap-6 p-6">
-          
-          {/* ESCÁNER REDUCIDO A UN CUADRADO COMPACTO DE 192x192px */}
-          <div className="relative mx-auto h-48 w-48 overflow-hidden rounded-2xl border border-white/10 bg-[#0a0a0a] shadow-inner">
-             {/* Fondo estético por si la cámara de Apple se pone negra */}
-             <div className="absolute inset-0 flex flex-col items-center justify-center opacity-30 pointer-events-none">
-                <ScanLine className="size-8 text-white mb-2" />
-                <span className="text-[10px] font-bold text-white uppercase tracking-wider">Escaneando...</span>
-             </div>
-             
-             {/* Contenedor del video sin que rompa el alto */}
-             <div className="relative z-10 flex h-full w-full items-center justify-center [&>div]:!pt-0">
-               <QrReader
-                  onResult={(result: any) => {
-                    if (!!result) handleScan(result?.getText())
-                  }}
-                  constraints={{ facingMode: 'environment' }}
-                  containerStyle={{ width: '100%', height: '100%' }}
-                  videoStyle={{ objectFit: 'cover', width: '100%', height: '100%' }}
-               />
-             </div>
-             <div className="absolute inset-x-4 top-1/2 z-20 h-0.5 -translate-y-1/2 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
+    <Modal open onClose={onClose} title="Validar Entrega" className="max-w-sm bg-card">
+      <div className="flex flex-col gap-6 p-6">
+        <div className="space-y-4">
+          <p className="text-center text-sm font-bold text-muted-foreground">
+            Ingrese el código de 4 dígitos proporcionado por el cliente
+          </p>
+          <div className="flex gap-2">
+            <input 
+              value={manualCode}
+              type="text" 
+              inputMode="numeric"
+              placeholder="Ej: 1234"
+              maxLength={4}
+              onChange={(e) => {
+                setManualCode(e.target.value)
+                setError('')
+              }}
+              className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-3xl tracking-widest font-black focus:border-primary focus:outline-none"
+            />
           </div>
-
-          <div className="space-y-4 border-t border-border pt-6">
-             <p className="text-center text-sm font-bold text-muted-foreground flex items-center justify-center gap-2">
-               <Keyboard className="size-4" /> Validación Alternativa (Código Typebot)
-             </p>
-             <div className="flex gap-2">
-               <input 
-                 ref={inputRef}
-                 type="text" 
-                 inputMode="numeric"
-                 placeholder="Ej: 1234"
-                 maxLength={4}
-                 onChange={() => setError('')}
-                 className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-2xl tracking-widest font-black text-white focus:border-primary focus:outline-none"
-               />
-               <button 
-                 onClick={handleManualValidation}
-                 className="rounded-xl bg-brand-yellow px-6 font-bold text-brand-yellow-foreground hover:brightness-110 transition-all"
-               >
-                 Validar
-               </button>
-             </div>
-             {error && <p className="text-center text-sm font-bold text-destructive">{error}</p>}
-          </div>
+          <button 
+            onClick={handleValidation}
+            disabled={manualCode.length < 4}
+            className="w-full rounded-xl bg-brand-yellow py-3 font-bold text-brand-yellow-foreground hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Validar Código
+          </button>
+          {error && <p className="text-center text-sm font-bold text-destructive">{error}</p>}
         </div>
-      </Modal>
-    </div>
+      </div>
+    </Modal>
   )
 }
