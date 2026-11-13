@@ -1,20 +1,20 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState, memo } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import {
   Check,
   CheckCircle2,
   Inbox,
   QrCode,
   RefreshCw,
-  ScanLine,
   Timer,
   Edit3,
   PackageCheck,
   AlertTriangle,
   Keyboard,
   Camera,
-  Loader2
+  Loader2,
+  ImageIcon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
@@ -28,9 +28,8 @@ const QrReader = dynamic(
   { ssr: false, loading: () => <div className="flex h-full items-center justify-center bg-black"><Loader2 className="size-8 animate-spin text-white/50" /></div> }
 )
 
-type AppOrder = Order & { pickupTime?: string; securityCode?: string }
+type AppOrder = Order & { pickupTime?: string; securityCode?: string; evidencePhoto?: string }
 
-// 1. SOLUCIÓN AL TECLADO: Aislamos el cronómetro para que la pantalla principal NO se recargue cada segundo
 function useNow() {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -55,7 +54,6 @@ function timerTone(seconds: number) {
   return 'text-success'
 }
 
-// Componente aislado del cronómetro
 const OrderTimer = memo(({ order, large = false }: { order: Order; large?: boolean }) => {
   const now = useNow()
   const secs = remaining(order, now)
@@ -80,7 +78,7 @@ OrderTimer.displayName = 'OrderTimer'
 type EmployeeTab = 'pendientes' | 'listos' | 'entregados'
 
 export function PedidosView() {
-  const { orders, completedOrders, deliveredOrders, completeOrder, deliverOrder } = useStore()
+  const { orders, completedOrders, deliveredOrders, completeOrder, deliverOrder, saveEvidence } = useStore()
   
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [scannerOpen, setScannerOpen] = useState(false)
@@ -89,18 +87,8 @@ export function PedidosView() {
 
   const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
   const [substitutionNote, setSubstitutionNote] = useState('')
-  
-  // ESTADOS PARA EVIDENCIA FOTOGRÁFICA (Anti-fraude)
-  const [photoEvidence, setPhotoEvidence] = useState<string | null>(null)
   const [isUploading, setIsUploading] = useState(false)
 
-  // Al cambiar de pedido, limpiamos la foto temporal
-  useEffect(() => {
-    setPhotoEvidence(null)
-    setSubstitutionNote('')
-  }, [selectedId, activeTab])
-
-  // Simulamos el ordenamiento basado en un tiempo estático para evitar recargas
   const sorted = [...(orders as AppOrder[])].sort((a, b) => {
     const aUrgent = a.pickupTime === 'Lo antes posible (30 min)'
     const bUrgent = b.pickupTime === 'Lo antes posible (30 min)'
@@ -119,15 +107,15 @@ export function PedidosView() {
           : null
   ) as AppOrder | null
 
-  // SIMULADOR DE CLOUDINARY PARA LA PRESENTACIÓN
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // MOCKEADOR DE CLOUDINARY
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, orderId: string) => {
     const file = e.target.files?.[0]
     if (file) {
       setIsUploading(true)
-      // Simulamos 2 segundos de subida a la nube
       setTimeout(() => {
         setIsUploading(false)
-        setPhotoEvidence(`https://res.cloudinary.com/lacosmina/image/upload/v1/empaquetado_${selected?.id}.jpg`)
+        const fakeUrl = `https://res.cloudinary.com/lacosmina/image/upload/v1/empaquetado_${orderId}.jpg`
+        saveEvidence(orderId, fakeUrl)
       }, 2000)
     }
   }
@@ -135,7 +123,6 @@ export function PedidosView() {
   const handleReady = (order: Order) => {
     completeOrder(order.id, substitutionNote.trim())
     setSubstitutionNote('')
-    setPhotoEvidence(null)
     const index = sorted.findIndex((o) => o.id === order.id)
     const next = sorted[index + 1] ?? sorted[index - 1]
     setSelectedId(next?.id ?? null)
@@ -213,7 +200,6 @@ export function PedidosView() {
                             </span>
                           )}
                         </div>
-                        {/* Se usa el componente aislado */}
                         <OrderTimer order={order} />
                       </div>
                       <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
@@ -310,7 +296,6 @@ export function PedidosView() {
         </ul>
       </section>
 
-      {/* PANEL DERECHO */}
       <section aria-label="Detalle" className="flex min-h-0 flex-col overflow-y-auto border-t border-border md:border-t-0">
         {selected ? (
           <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
@@ -397,37 +382,36 @@ export function PedidosView() {
               })}
             </ul>
 
-            {/* SECCIÓN ANTI-FRAUDE: EVIDENCIA FOTOGRÁFICA DE EMPAQUETADO */}
-            {activeTab === 'pendientes' && (
-              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-                <p className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">
-                  <Camera className="size-4" />
-                  Control Anti-Fraude: Evidencia Fotográfica
-                </p>
-                <p className="mb-3 text-xs text-muted-foreground">Sube una foto del pedido empaquetado para protegerte ante reclamos falsos.</p>
-                
-                {isUploading ? (
-                  <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-primary/30 bg-primary/10">
-                    <Loader2 className="size-5 animate-spin text-primary" />
-                    <span className="ml-2 text-xs font-bold text-primary">Subiendo a Cloudinary...</span>
-                  </div>
-                ) : photoEvidence ? (
-                  <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-4 py-3">
-                    <span className="flex items-center gap-2 text-xs font-bold text-success">
-                      <CheckCircle2 className="size-4" /> Imagen guardada en la nube
-                    </span>
-                    <button onClick={() => setPhotoEvidence(null)} className="text-xs font-bold text-muted-foreground hover:underline">Eliminar</button>
-                  </div>
-                ) : (
+            {/* SECCIÓN EVIDENCIA VISIBLE EN TODAS LAS PESTAÑAS */}
+            <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">
+                <Camera className="size-4" />
+                Control Anti-Fraude: Evidencia Fotográfica
+              </p>
+              
+              {isUploading ? (
+                <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-primary/30 bg-primary/10">
+                  <Loader2 className="size-5 animate-spin text-primary" />
+                  <span className="ml-2 text-xs font-bold text-primary">Subiendo a Cloudinary...</span>
+                </div>
+              ) : selected.evidencePhoto ? (
+                <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-4 py-3">
+                  <span className="flex items-center gap-2 text-xs font-bold text-success">
+                    <CheckCircle2 className="size-4" /> Foto de paquete guardada
+                  </span>
+                  <a href={selected.evidencePhoto} target="_blank" className="text-xs font-bold text-primary hover:underline flex items-center gap-1"><ImageIcon className="size-3" /> Ver imagen</a>
+                </div>
+              ) : (
+                <>
+                  <p className="mb-3 text-xs text-muted-foreground">Sube una foto del pedido empaquetado para protegerte ante reclamos falsos.</p>
                   <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/10 text-sm font-bold text-primary hover:bg-primary/20 transition-colors">
                     <Camera className="size-4" />
                     Tomar foto del paquete
-                    {/* El atributo capture="environment" abre la cámara trasera del celular automáticamente */}
-                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, selected.id)} />
                   </label>
-                )}
-              </div>
-            )}
+                </>
+              )}
+            </div>
 
             {hasSubstitutions && activeTab === 'pendientes' && (
               <div className="rounded-xl border border-brand-yellow bg-brand-yellow/5 p-4">
@@ -457,10 +441,10 @@ export function PedidosView() {
                 <button
                   type="button"
                   onClick={() => handleReady(selected)}
-                  disabled={!allPicked || !photoEvidence}
+                  disabled={!allPicked || !selected.evidencePhoto}
                   className={cn(
                     "flex h-16 w-full items-center justify-center gap-2 rounded-xl text-lg font-black transition-all",
-                    allPicked && photoEvidence
+                    allPicked && selected.evidencePhoto
                       ? "bg-success text-success-foreground hover:brightness-95 shadow-lg shadow-success/20"
                       : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
                   )}
@@ -468,7 +452,7 @@ export function PedidosView() {
                   <CheckCircle2 className="size-6" />
                   1. Marcar Pedido como Listo
                 </button>
-                {(!allPicked || !photoEvidence) && (
+                {(!allPicked || !selected.evidencePhoto) && (
                   <p className="mt-2 text-center text-xs font-semibold text-destructive">
                     {!allPicked ? "Falta marcar productos." : "Falta adjuntar evidencia fotográfica."}
                   </p>
@@ -511,7 +495,6 @@ export function PedidosView() {
         )}
       </section>
 
-      {/* MODAL CON CÁMARA REAL Y TECLADO ESTABLE */}
       {scannerOpen && selected && (
         <QrScannerModal
           orderId={selected.id}
@@ -538,19 +521,18 @@ function QrScannerModal({
   onValidated: () => void
   onClose: () => void
 }) {
-  // Input NO controlado mediante useRef, el teclado numérico de tu celular ya NO se cerrará
   const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
 
   const handleManualValidation = () => {
     const manualCode = inputRef.current?.value.trim() || ''
-    
     if (securityCode === '') {
       setError('Aún no hay código en el Excel. Vuelva a intentar.')
       return
     }
     
-    if (manualCode === securityCode.trim()) {
+    // LIMPIEZA ADICIONAL: Eliminamos espacios accidentales
+    if (manualCode === securityCode) {
       onValidated()
     } else {
       setError('Código incorrecto. Verifique los 4 dígitos del cliente.')
@@ -559,7 +541,7 @@ function QrScannerModal({
 
   const handleScan = (data: string | null) => {
     if (data) {
-      if (securityCode !== '' && data.includes(securityCode.trim())) {
+      if (securityCode !== '' && data.includes(securityCode)) {
         onValidated()
       } else {
         setError('El código QR escaneado no es válido para este pedido.')
