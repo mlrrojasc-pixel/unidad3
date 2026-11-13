@@ -22,13 +22,6 @@ import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
 import { useStore } from '@/components/store-provider'
 import { Modal } from '@/components/shared'
-import dynamic from 'next/dynamic'
-
-const QrReader = dynamic(
-  // @ts-ignore
-  () => import('react-qr-reader').then((mod) => mod.QrReader),
-  { ssr: false, loading: () => <div className="flex h-full items-center justify-center bg-black"><Loader2 className="size-8 animate-spin text-white/50" /></div> }
-)
 
 type AppOrder = Order & { pickupTime?: string; securityCode?: string; evidencePhoto?: string }
 
@@ -90,8 +83,6 @@ export function PedidosView() {
   const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
   const [substitutionNote, setSubstitutionNote] = useState('')
   const [isUploading, setIsUploading] = useState(false)
-  
-  // SISTEMA MULTI-FOTO: Guardamos un array de imágenes temporales
   const [localPhotos, setLocalPhotos] = useState<string[]>([])
 
   useEffect(() => {
@@ -117,7 +108,6 @@ export function PedidosView() {
           : null
   ) as AppOrder | null
 
-  // FOTOS A CLOUDINARY (MÚLTIPLES)
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, orderId: string) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -139,7 +129,6 @@ export function PedidosView() {
         if (activeTab === 'pendientes') {
           setLocalPhotos(prev => [...prev, data.secure_url])
         } else {
-          // Si ya está listo o entregado, adjuntamos la nueva foto a las que ya existen en la base de datos
           const existingPhotos = selected?.evidencePhoto ? selected.evidencePhoto.split(',') : []
           saveEvidence(orderId, [...existingPhotos, data.secure_url].join(','))
         }
@@ -165,7 +154,6 @@ export function PedidosView() {
   }
 
   const handleReady = (order: Order) => {
-    // Almacenamos el array de URLs separado por comas
     completeOrder(order.id, substitutionNote.trim(), localPhotos.length > 0 ? localPhotos.join(',') : undefined)
     setSubstitutionNote('')
     setLocalPhotos([])
@@ -181,11 +169,7 @@ export function PedidosView() {
 
   const hasSubstitutions = selected?.items.some((item) => item.substitute)
   const allPicked = selected?.items.every((_, i) => picked[`${selected.id}-${i}`])
-  
-  // Fotos que se muestran en la UI
-  const currentPhotos = activeTab === 'pendientes' 
-    ? localPhotos 
-    : (selected?.evidencePhoto ? selected.evidencePhoto.split(',') : [])
+  const currentPhotos = activeTab === 'pendientes' ? localPhotos : (selected?.evidencePhoto ? selected.evidencePhoto.split(',') : [])
 
   return (
     <div className="grid h-full min-h-0 md:grid-cols-[minmax(300px,390px)_1fr]">
@@ -390,7 +374,7 @@ export function PedidosView() {
               {(validated[selected.id] || activeTab === 'entregados') && (
                 <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
                   <CheckCircle2 className="size-3.5" />
-                  QR validado
+                  Entregado
                 </span>
               )}
             </div>
@@ -433,7 +417,6 @@ export function PedidosView() {
               })}
             </ul>
 
-            {/* SECCIÓN MULTI-FOTO */}
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <p className="flex items-center gap-2 text-sm font-bold text-primary">
@@ -498,6 +481,13 @@ export function PedidosView() {
               </div>
             )}
 
+            {activeTab !== 'pendientes' && 'substitutionNote' in selected && selected.substitutionNote && (
+              <div className="rounded-xl border border-border bg-muted p-4">
+                <p className="mb-1 text-sm font-bold text-muted-foreground">Producto usado como sustituto:</p>
+                <p className="text-sm">{selected.substitutionNote}</p>
+              </div>
+            )}
+
             {activeTab === 'pendientes' && (
               <div className="mt-auto">
                 <button
@@ -523,29 +513,25 @@ export function PedidosView() {
             )}
 
             {activeTab === 'listos' && (
-              <div className="mt-auto grid gap-3 sm:grid-cols-2">
+              <div className="mt-auto grid gap-3">
                 <button
                   type="button"
                   onClick={() => setScannerOpen(true)}
                   className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95 shadow-lg shadow-brand-yellow/20"
                 >
                   <QrCode className="size-6" />
-                  Escanear / Ingresar Código
+                  Ingresar Código de Entrega
                 </button>
-                <button
-                  type="button"
-                  onClick={() => handleDeliver(selected.id)}
-                  disabled={!validated[selected.id]}
-                  className={cn(
-                    "flex h-16 items-center justify-center gap-2 rounded-xl text-lg font-black transition-all",
-                    validated[selected.id] 
-                      ? "bg-success text-success-foreground hover:brightness-95 shadow-lg shadow-success/20" 
-                      : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
-                  )}
-                >
-                  <PackageCheck className="size-6" />
-                  2. Confirmar Entrega
-                </button>
+                {validated[selected.id] && (
+                  <button
+                    type="button"
+                    onClick={() => handleDeliver(selected.id)}
+                    className="flex h-16 items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95 shadow-lg shadow-success/20 transition-all"
+                  >
+                    <PackageCheck className="size-6" />
+                    2. Confirmar Entrega
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -558,7 +544,7 @@ export function PedidosView() {
       </section>
 
       {scannerOpen && selected && (
-        <QrScannerModal
+        <ValidationModal
           orderId={selected.id}
           securityCode={selected.securityCode || ''}
           onValidated={() => {
@@ -572,7 +558,7 @@ export function PedidosView() {
   )
 }
 
-function QrScannerModal({
+function ValidationModal({
   orderId,
   securityCode,
   onValidated,
@@ -583,82 +569,56 @@ function QrScannerModal({
   onValidated: () => void
   onClose: () => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const [manualCode, setManualCode] = useState('')
   const [error, setError] = useState('')
 
-  const handleManualValidation = () => {
-    const manualCode = (inputRef.current?.value || '').replace(/[^0-9]/g, '')
+  const handleValidation = () => {
     const cleanTarget = (securityCode || '').replace(/[^0-9]/g, '')
+    const cleanInput = manualCode.replace(/[^0-9]/g, '')
     
     if (!cleanTarget) {
       setError('Aún no hay código en el Excel. Vuelva a intentar.')
       return
     }
     
-    if (manualCode === cleanTarget) {
+    if (cleanInput === cleanTarget) {
       onValidated()
     } else {
       setError('Código incorrecto. Verifique los 4 dígitos del cliente.')
     }
   }
 
-  const handleScan = (data: string | null) => {
-    if (data) {
-      const cleanData = data.replace(/[^0-9]/g, '')
-      const cleanTarget = (securityCode || '').replace(/[^0-9]/g, '')
-      if (cleanTarget !== '' && cleanData.includes(cleanTarget)) {
-        onValidated()
-      } else {
-        setError('El código QR escaneado no es válido para este pedido.')
-      }
-    }
-  }
-
   return (
-    <div className="dark">
-      <Modal open onClose={onClose} title="Validar Entrega" className="max-w-md bg-card">
-        <div className="flex flex-col gap-6 p-6">
-          
-          {/* REPARACIÓN DEL ESCÁNER NEGRO: Se inyecta padding-top explícito en containerStyle */}
-          <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
-             <QrReader
-                onResult={(result: any) => {
-                  if (!!result) {
-                    handleScan(result?.getText())
-                  }
-                }}
-                constraints={{ facingMode: 'environment' }}
-                containerStyle={{ width: '100%', paddingTop: '100%' }}
-                videoStyle={{ objectFit: 'cover' }}
-             />
-             <div className="absolute inset-x-6 top-1/2 h-0.5 -translate-y-1/2 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
+    <Modal open onClose={onClose} title="Validar Entrega" className="max-w-sm bg-card">
+      <div className="flex flex-col gap-6 p-6">
+        <div className="space-y-4">
+          <p className="text-center text-sm font-bold text-muted-foreground">
+            Ingrese el código de 4 dígitos proporcionado por el cliente
+          </p>
+          <div className="flex gap-2">
+            <input 
+              value={manualCode}
+              type="text" 
+              inputMode="numeric"
+              placeholder="Ej: 1234"
+              maxLength={4}
+              onChange={(e) => {
+                setManualCode(e.target.value)
+                setError('')
+              }}
+              className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-3xl tracking-widest font-black focus:border-primary focus:outline-none"
+            />
           </div>
-
-          <div className="space-y-4 border-t border-border pt-6">
-             <p className="text-center text-sm font-bold text-muted-foreground flex items-center justify-center gap-2">
-               <Keyboard className="size-4" /> Validación Alternativa (Código Typebot)
-             </p>
-             <div className="flex gap-2">
-               <input 
-                 ref={inputRef}
-                 type="text" 
-                 inputMode="numeric"
-                 placeholder="Ej: 1234"
-                 maxLength={4}
-                 onChange={() => setError('')}
-                 className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-2xl tracking-widest font-black text-white focus:border-primary focus:outline-none"
-               />
-               <button 
-                 onClick={handleManualValidation}
-                 className="rounded-xl bg-brand-yellow px-6 font-bold text-brand-yellow-foreground hover:brightness-110 transition-all"
-               >
-                 Validar
-               </button>
-             </div>
-             {error && <p className="text-center text-sm font-bold text-destructive">{error}</p>}
-          </div>
+          <button 
+            onClick={handleValidation}
+            disabled={manualCode.length < 4}
+            className="w-full rounded-xl bg-brand-yellow py-3 font-bold text-brand-yellow-foreground hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Validar Código
+          </button>
+          {error && <p className="text-center text-sm font-bold text-destructive">{error}</p>}
         </div>
-      </Modal>
-    </div>
+      </div>
+    </Modal>
   )
 }
