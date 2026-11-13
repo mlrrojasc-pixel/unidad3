@@ -13,7 +13,6 @@ import {
 } from '@/lib/store-data'
 
 export type PaymentMethod = Order['payment']
-
 export type AppOrder = Order & { pickupTime?: string; securityCode?: string }
 
 export interface CartLine {
@@ -112,19 +111,8 @@ interface StoreContextValue {
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
-
 const MAX_QTY = 20
-
-const VALID_DOMAINS = [
-  'gmail.com',
-  'hotmail.com',
-  'outlook.com',
-  'outlook.es',
-  'icloud.com',
-  'yahoo.com',
-  'yahoo.es',
-  'unac.edu.pe',
-]
+const VALID_DOMAINS = ['gmail.com', 'hotmail.com', 'outlook.com', 'outlook.es', 'icloud.com', 'yahoo.com', 'yahoo.es', 'unac.edu.pe']
 
 const getLocalData = <T,>(key: string, defaultValue: T): T => {
   if (typeof window === 'undefined') return defaultValue
@@ -187,48 +175,63 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             window.localStorage.setItem('lacosmina_accounts', JSON.stringify(cuentasSincronizadas))
           }
         }
-      })
-      .catch(error => console.error('Error al sincronizar cuentas:', error))
+      }).catch(() => {})
   }, [])
 
+  // SISTEMA ANTIDUPLICADOS Y LECTURA SEGURA DEL CÓDIGO QR
   useEffect(() => {
     if (user && user.phone) {
       fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/search?Celular=${user.phone}`)
         .then(res => res.json())
         .then(data => {
           if (Array.isArray(data) && data.length > 0) {
-            const activos: AppOrder[] = []
-            const completados: CompletedOrder[] = []
-            const entregados: CompletedOrder[] = []
+            const orderMap = new Map();
 
             data.forEach((fila: any) => {
-              let itemsParsed = []
+              const id = fila['ID de Pedido'];
+              if (!id) return;
+
+              let itemsParsed = [];
               try { 
-                itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : [] 
+                itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : [];
               } catch(e) {}
 
+              // Si ya existe en el mapa y esta fila actual está vacía, la ignoramos.
+              if (orderMap.has(id) && itemsParsed.length === 0) return;
+
+              // Evita que SheetDB rompa el código si lo envía como número y busca posibles variantes del título
+              const rawCode = fila['Código QR'] ?? fila['Codigo QR'] ?? fila['Codigo qr'] ?? '';
+              const securityCode = String(rawCode).trim();
+
               const baseOrder: AppOrder = {
-                id: fila['ID de Pedido'],
-                customer: fila['Cliente'],
+                id,
+                customer: fila['Cliente'] || '',
                 sede: SEDES[0],
                 payment: 'Tarjeta',
-                pickupTime: fila['Horario de Recojo'],
+                pickupTime: fila['Horario de Recojo'] || '',
                 slaSeconds: 1800,
                 deadline: Date.now() + 1800000,
                 substitution: fila['Sustitución'] !== 'Ninguna',
                 items: itemsParsed,
-                // SOLUCIÓN AL CÓDIGO TYPEBOT: Lo forzamos a ser un texto (String)
-                securityCode: fila['Código QR'] ? String(fila['Código QR']).trim() : '', 
+                securityCode: securityCode,
               }
 
-              if (fila['Estado'] === 'Entregado') {
-                entregados.push({ ...baseOrder, deliveredAt: fila['Hora de Entrega'] || '' } as CompletedOrder)
-              } else if (fila['Estado'] === 'Listo para recoger') {
+              orderMap.set(id, { baseOrder, estado: fila['Estado'], hora: fila['Hora de Entrega'] });
+            })
+
+            const activos: AppOrder[] = [];
+            const completados: CompletedOrder[] = [];
+            const entregados: CompletedOrder[] = [];
+
+            orderMap.forEach(({ baseOrder, estado, hora }) => {
+              if (estado === 'Entregado') {
+                entregados.push({ ...baseOrder, deliveredAt: hora || 'Hora no registrada' } as CompletedOrder)
+              } else if (estado === 'Listo para recoger') {
                 completados.push({ ...baseOrder, readyAt: 'Listo' } as CompletedOrder)
               } else {
                 activos.push(baseOrder as AppOrder)
               }
-            })
+            });
 
             setOrders(activos)
             setCompletedOrders(completados)
@@ -380,6 +383,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCompletedOrders((prev) => {
       const orderToDeliver = prev.find((o) => o.id === id)
       if (orderToDeliver) {
+        // HORA EXACTA Y FORMATO LIMPIO
         const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
         
         setDeliveredOrders((dPrev) => [{ ...orderToDeliver, deliveredAt: nowStr }, ...dPrev.filter((item) => item.id !== id)])
