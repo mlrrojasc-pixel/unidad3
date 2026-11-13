@@ -26,7 +26,6 @@ const QrReader = dynamic(
   { ssr: false, loading: () => <p className="text-muted-foreground text-sm p-4 text-center">Iniciando cámara...</p> }
 )
 
-// Añadimos securityCode para que Typescript lo reconozca
 type AppOrder = Order & { pickupTime?: string; securityCode?: string }
 
 function useNow() {
@@ -241,8 +240,7 @@ export function PedidosView() {
                         <span className="font-black">{order.id}</span>
                         <span className="flex items-center gap-1 text-xs font-bold text-success">
                           <PackageCheck className="size-4" />
-                          {/* SOLUCIÓN AL ENTREGADO ENTREGADO: */}
-                          Entregado {order.deliveredAt ? order.deliveredAt : ''}
+                          Entregado a las {order.deliveredAt ? order.deliveredAt : ''}
                         </span>
                       </div>
                       <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
@@ -403,7 +401,7 @@ export function PedidosView() {
                   className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95"
                 >
                   <QrCode className="size-6" />
-                  Escanear / Ingreso Manual
+                  Escanear / Ingresar Código
                 </button>
                 <button
                   type="button"
@@ -456,16 +454,19 @@ function QrScannerModal({
   onValidated: () => void
   onClose: () => void
 }) {
-  const [manualCode, setManualCode] = useState('')
+  // SOLUCIÓN AL TECLADO: Input no controlado que no fuerza a la pantalla a recargarse mientras escribes
+  const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
 
   const handleManualValidation = () => {
+    const manualCode = inputRef.current?.value.trim() || ''
+    
     if (securityCode === '') {
       setError('Aún no hay código en el Excel. Vuelva a intentar.')
       return
     }
-    // SOLUCIÓN A CÓDIGO TYPEBOT: Validamos con los 4 dígitos
-    if (manualCode.trim() === securityCode.trim()) {
+    
+    if (manualCode === securityCode) {
       onValidated()
     } else {
       setError('Código incorrecto. Verifique los 4 dígitos del cliente.')
@@ -489,7 +490,7 @@ function QrScannerModal({
           
           <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black border border-white/10 flex flex-col items-center justify-center">
              <QrReader
-                onResult={(result: any, error: any) => {
+                onResult={(result: any) => {
                   if (!!result) {
                     handleScan(result?.getText())
                   }
@@ -507,14 +508,11 @@ function QrScannerModal({
              </p>
              <div className="flex gap-2">
                <input 
-                 type="text" 
+                 ref={inputRef}
+                 type="number" 
                  placeholder="Ej: 1234"
                  maxLength={4}
-                 value={manualCode}
-                 onChange={(e) => {
-                   setManualCode(e.target.value)
-                   setError('')
-                 }}
+                 onChange={() => setError('')}
                  className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-2xl tracking-widest font-black text-white focus:border-primary focus:outline-none"
                />
                <button 
