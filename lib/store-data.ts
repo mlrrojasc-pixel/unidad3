@@ -97,7 +97,7 @@ export function discountPercent(product: Product) {
   if (!product.oldPrice) return 0
   return Math.round((1 - product.price / product.oldPrice) * 100)
 }
-const sheetdbUrl = 'https://sheetdb.io/api/v1/5f2glnefammpr'; // Usamos la API de Supermarket app
+const sheetdbUrl = 'https://sheetdb.io/api/v1/k78fylj6v3892'; // Usamos la API de Supermarket app
 
 if (typeof window !== 'undefined') {
   window.onload = async () => {
