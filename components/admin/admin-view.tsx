@@ -149,8 +149,9 @@ export function AdminView() {
                 <div className="grid gap-6 xl:grid-cols-2">
                   {complaints.map((c) => {
                     const relatedOrder = allOrders.find(o => o.id === c.orderId);
-                    // LEYENDO LA EVIDENCIA DE CLOUDINARY
-                    const employeeEvidence = relatedOrder?.evidencePhoto || null;
+                    
+                    // PROCESAMIENTO MÚLTIPLES FOTOS DEL EMPLEADO
+                    const employeeEvidences = relatedOrder?.evidencePhoto ? relatedOrder.evidencePhoto.split(',') : [];
 
                     return (
                       <div key={c.id} className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141419] shadow-xl">
@@ -190,18 +191,16 @@ export function AdminView() {
                               )}
                             </div>
 
-                            {/* Evidencia del Empleado (Cloudinary) */}
+                            {/* Evidencias del Empleado */}
                             <div className="flex flex-col gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
                               <p className="text-[10px] font-bold uppercase text-primary">Control de Tienda</p>
-                              {employeeEvidence ? (
-                                <div className="flex items-center gap-2">
-                                  <div onClick={() => setSelectedImage(employeeEvidence)} className="size-10 shrink-0 rounded-lg border border-primary/20 overflow-hidden cursor-pointer hover:opacity-80">
-                                    <img src={employeeEvidence} alt="Tienda" className="size-full object-cover" />
-                                  </div>
-                                  <div>
-                                    <p className="text-xs font-bold text-primary flex items-center gap-1"><Camera className="size-3" /> Empacado</p>
-                                    <button onClick={() => setSelectedImage(employeeEvidence)} className="text-[10px] text-white hover:underline mt-0.5">Revisar foto</button>
-                                  </div>
+                              {employeeEvidences.length > 0 ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {employeeEvidences.map((photo, idx) => (
+                                    <div key={idx} onClick={() => setSelectedImage(photo)} className="size-10 shrink-0 rounded-lg border border-primary/20 overflow-hidden cursor-pointer hover:opacity-80">
+                                      <img src={photo} alt="Tienda" className="size-full object-cover" />
+                                    </div>
+                                  ))}
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2 opacity-50">
