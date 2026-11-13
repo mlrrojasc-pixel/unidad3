@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, memo } from 'react'
+import { useEffect, useRef, useState, memo } from 'react'
 import {
   Check,
   CheckCircle2,
@@ -25,7 +25,7 @@ import dynamic from 'next/dynamic'
 const QrReader = dynamic(
   // @ts-ignore
   () => import('react-qr-reader').then((mod) => mod.QrReader),
-  { ssr: false }
+  { ssr: false, loading: () => <div className="flex h-full items-center justify-center bg-black"><Loader2 className="size-8 animate-spin text-white/50" /></div> }
 )
 
 type AppOrder = Order & { pickupTime?: string; securityCode?: string; evidencePhoto?: string }
@@ -112,7 +112,6 @@ export function PedidosView() {
           : null
   ) as AppOrder | null
 
-  // CARGA REAL A CLOUDINARY
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, orderId: string) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -121,7 +120,6 @@ export function PedidosView() {
     const formData = new FormData()
     formData.append('file', file)
     
-    // TUS CREDENCIALES EXACTAS DE CLOUDINARY
     formData.append('upload_preset', 'lacosmina') 
     const cloudName = 'oa8smyy9' 
 
@@ -139,7 +137,7 @@ export function PedidosView() {
           saveEvidence(orderId, data.secure_url)
         }
       } else {
-        alert('Hubo un error subiendo la foto. Verifica tu Cloud Name y Upload Preset.')
+        alert('Hubo un error subiendo la foto.')
       }
     } catch (error) {
       console.error('Error Cloudinary', error)
@@ -559,30 +557,20 @@ function QrScannerModal({
   onValidated: () => void
   onClose: () => void
 }) {
-  const [manualCode, setManualCode] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
   const [error, setError] = useState('')
-  const [cameraReady, setCameraReady] = useState(false)
-
-  // Le damos a la cámara un respiro de 400ms para que termine de abrir la ventana negra antes de encender el lente
-  useEffect(() => {
-    const t = setTimeout(() => setCameraReady(true), 400)
-    return () => clearTimeout(t)
-  }, [])
-
-  // LIMPIEZA EXTREMA: El código que llega del excel se despoja de letras, apóstrofes y espacios
-  const cleanTarget = securityCode.replace(/[^0-9]/g, '')
 
   const handleManualValidation = () => {
-    // Al texto que tú escribes también le quitamos espacios accidentales
-    const cleanInput = manualCode.replace(/[^0-9]/g, '')
+    // 3. LIMPIEZA EXTREMA: Solo números
+    const manualCode = (inputRef.current?.value || '').replace(/[^0-9]/g, '')
+    const cleanTarget = (securityCode || '').replace(/[^0-9]/g, '')
     
     if (!cleanTarget) {
-      setError('Aún no hay código en la base de datos. Vuelva a intentar.')
+      setError('Aún no hay código en el Excel. Vuelva a intentar.')
       return
     }
     
-    // Si los números son exactamente iguales, pasa
-    if (cleanInput === cleanTarget) {
+    if (manualCode === cleanTarget) {
       onValidated()
     } else {
       setError('Código incorrecto. Verifique los 4 dígitos del cliente.')
@@ -592,6 +580,8 @@ function QrScannerModal({
   const handleScan = (data: string | null) => {
     if (data) {
       const cleanData = data.replace(/[^0-9]/g, '')
+      const cleanTarget = (securityCode || '').replace(/[^0-9]/g, '')
+      
       if (cleanTarget !== '' && cleanData.includes(cleanTarget)) {
         onValidated()
       } else {
@@ -605,25 +595,18 @@ function QrScannerModal({
       <Modal open onClose={onClose} title="Validar Entrega" className="max-w-md bg-card">
         <div className="flex flex-col gap-6 p-6">
           
-          <div className="relative aspect-square w-full overflow-hidden rounded-2xl border border-white/10 flex flex-col items-center justify-center bg-black">
-             {!cameraReady ? (
-               <div className="flex flex-col items-center text-muted-foreground">
-                 <Loader2 className="size-8 animate-spin mb-2" />
-                 <span className="text-xs font-bold">Iniciando cámara...</span>
-               </div>
-             ) : (
-               <>
-                 <QrReader
-                    onResult={(result: any) => {
-                      if (!!result) handleScan(result?.getText())
-                    }}
-                    constraints={{ facingMode: 'environment' }}
-                    containerStyle={{ width: '100%', height: '100%', paddingTop: 0 }}
-                    videoStyle={{ objectFit: 'cover', width: '100%', height: '100%' }}
-                 />
-                 <div className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
-               </>
-             )}
+          <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black border border-white/10 flex flex-col items-center justify-center">
+             <QrReader
+                onResult={(result: any) => {
+                  if (!!result) {
+                    handleScan(result?.getText())
+                  }
+                }}
+                constraints={{ facingMode: 'user' }} // SOLUCIÓN CÁMARA MAC/CELULAR
+                containerStyle={{ width: '100%', height: '100%' }}
+                videoStyle={{ objectFit: 'cover' }}
+             />
+             <div className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
           </div>
 
           <div className="space-y-4 border-t border-border pt-6">
@@ -632,15 +615,12 @@ function QrScannerModal({
              </p>
              <div className="flex gap-2">
                <input 
-                 value={manualCode}
+                 ref={inputRef}
                  type="text" 
                  inputMode="numeric"
                  placeholder="Ej: 1234"
                  maxLength={4}
-                 onChange={(e) => {
-                   setManualCode(e.target.value)
-                   setError('')
-                 }}
+                 onChange={() => setError('')}
                  className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-2xl tracking-widest font-black text-white focus:border-primary focus:outline-none"
                />
                <button 
