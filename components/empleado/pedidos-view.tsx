@@ -1,22 +1,36 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, memo } from 'react'
 import {
   Check,
   CheckCircle2,
   Inbox,
+  QrCode,
   RefreshCw,
+  ScanLine,
   Timer,
   Edit3,
   PackageCheck,
   AlertTriangle,
+  Keyboard,
+  Camera,
+  Loader2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
 import { useStore } from '@/components/store-provider'
+import { Modal } from '@/components/shared'
+import dynamic from 'next/dynamic'
+
+const QrReader = dynamic(
+  // @ts-ignore
+  () => import('react-qr-reader').then((mod) => mod.QrReader),
+  { ssr: false, loading: () => <div className="flex h-full items-center justify-center bg-black"><Loader2 className="size-8 animate-spin text-white/50" /></div> }
+)
 
 type AppOrder = Order & { pickupTime?: string; securityCode?: string }
 
+// 1. SOLUCIÓN AL TECLADO: Aislamos el cronómetro para que la pantalla principal NO se recargue cada segundo
 function useNow() {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -41,23 +55,58 @@ function timerTone(seconds: number) {
   return 'text-success'
 }
 
+// Componente aislado del cronómetro
+const OrderTimer = memo(({ order, large = false }: { order: Order; large?: boolean }) => {
+  const now = useNow()
+  const secs = remaining(order, now)
+  
+  if (large) {
+    return (
+      <p className={cn('font-mono text-3xl font-black tabular-nums', timerTone(secs))}>
+        {formatTime(secs)}
+      </p>
+    )
+  }
+
+  return (
+    <span className={cn('flex items-center gap-1 font-mono text-lg font-bold tabular-nums', timerTone(secs))}>
+      <Timer className="size-4" />
+      {secs < 0 ? 'Vencido' : formatTime(secs)}
+    </span>
+  )
+})
+OrderTimer.displayName = 'OrderTimer'
+
 type EmployeeTab = 'pendientes' | 'listos' | 'entregados'
 
 export function PedidosView() {
   const { orders, completedOrders, deliveredOrders, completeOrder, deliverOrder } = useStore()
-  const now = useNow()
+  
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [validated, setValidated] = useState<Record<string, boolean>>({})
   const [picked, setPicked] = useState<Record<string, boolean>>({})
 
   const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
   const [substitutionNote, setSubstitutionNote] = useState('')
+  
+  // ESTADOS PARA EVIDENCIA FOTOGRÁFICA (Anti-fraude)
+  const [photoEvidence, setPhotoEvidence] = useState<string | null>(null)
+  const [isUploading, setIsUploading] = useState(false)
 
+  // Al cambiar de pedido, limpiamos la foto temporal
+  useEffect(() => {
+    setPhotoEvidence(null)
+    setSubstitutionNote('')
+  }, [selectedId, activeTab])
+
+  // Simulamos el ordenamiento basado en un tiempo estático para evitar recargas
   const sorted = [...(orders as AppOrder[])].sort((a, b) => {
     const aUrgent = a.pickupTime === 'Lo antes posible (30 min)'
     const bUrgent = b.pickupTime === 'Lo antes posible (30 min)'
     if (aUrgent && !bUrgent) return -1
     if (!aUrgent && bUrgent) return 1
-    return remaining(a, now) - remaining(b, now)
+    return (a.deadline ?? 0) - (b.deadline ?? 0)
   })
 
   const selected = (
@@ -70,9 +119,23 @@ export function PedidosView() {
           : null
   ) as AppOrder | null
 
+  // SIMULADOR DE CLOUDINARY PARA LA PRESENTACIÓN
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setIsUploading(true)
+      // Simulamos 2 segundos de subida a la nube
+      setTimeout(() => {
+        setIsUploading(false)
+        setPhotoEvidence(`https://res.cloudinary.com/lacosmina/image/upload/v1/empaquetado_${selected?.id}.jpg`)
+      }, 2000)
+    }
+  }
+
   const handleReady = (order: Order) => {
     completeOrder(order.id, substitutionNote.trim())
     setSubstitutionNote('')
+    setPhotoEvidence(null)
     const index = sorted.findIndex((o) => o.id === order.id)
     const next = sorted[index + 1] ?? sorted[index - 1]
     setSelectedId(next?.id ?? null)
@@ -84,6 +147,7 @@ export function PedidosView() {
   }
 
   const hasSubstitutions = selected?.items.some((item) => item.substitute)
+  const allPicked = selected?.items.every((_, i) => picked[`${selected.id}-${i}`])
 
   return (
     <div className="grid h-full min-h-0 md:grid-cols-[minmax(300px,390px)_1fr]">
@@ -125,7 +189,6 @@ export function PedidosView() {
           {activeTab === 'pendientes' && (
             <>
               {sorted.map((order) => {
-                const secs = remaining(order, now)
                 const active = selected?.id === order.id
                 const isUrgent = order.pickupTime === 'Lo antes posible (30 min)'
 
@@ -150,10 +213,8 @@ export function PedidosView() {
                             </span>
                           )}
                         </div>
-                        <span className={cn('flex items-center gap-1 font-mono text-lg font-bold tabular-nums', timerTone(secs))}>
-                          <Timer className="size-4" />
-                          {secs < 0 ? 'Vencido' : formatTime(secs)}
-                        </span>
+                        {/* Se usa el componente aislado */}
+                        <OrderTimer order={order} />
                       </div>
                       <div className="mt-2 flex items-center justify-between text-sm text-muted-foreground">
                         <span>{order.customer}</span>
@@ -249,6 +310,7 @@ export function PedidosView() {
         </ul>
       </section>
 
+      {/* PANEL DERECHO */}
       <section aria-label="Detalle" className="flex min-h-0 flex-col overflow-y-auto border-t border-border md:border-t-0">
         {selected ? (
           <div className="flex flex-1 flex-col gap-5 p-4 md:p-6">
@@ -277,9 +339,7 @@ export function PedidosView() {
               {activeTab === 'pendientes' && (
                 <div className="rounded-xl bg-card px-4 py-3 text-right">
                   <p className="text-xs text-muted-foreground">Tiempo restante</p>
-                  <p className={cn('font-mono text-3xl font-black tabular-nums', timerTone(remaining(selected, now)))}>
-                    {formatTime(remaining(selected, now))}
-                  </p>
+                  <OrderTimer order={selected} large />
                 </div>
               )}
             </div>
@@ -289,6 +349,12 @@ export function PedidosView() {
                 <span className="flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1 text-xs font-semibold">
                   <RefreshCw className="size-3.5" />
                   Acepta sustitución
+                </span>
+              )}
+              {(validated[selected.id] || activeTab === 'entregados') && (
+                <span className="flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-xs font-semibold text-success">
+                  <CheckCircle2 className="size-3.5" />
+                  QR validado
                 </span>
               )}
             </div>
@@ -331,12 +397,37 @@ export function PedidosView() {
               })}
             </ul>
 
-            <div className="flex items-center justify-between rounded-xl bg-card px-4 py-3">
-              <span className="text-muted-foreground">Total del pedido</span>
-              <span className="text-xl font-black">
-                {formatPrice(selected.items.reduce((s, i) => s + i.qty * i.price, 0))}
-              </span>
-            </div>
+            {/* SECCIÓN ANTI-FRAUDE: EVIDENCIA FOTOGRÁFICA DE EMPAQUETADO */}
+            {activeTab === 'pendientes' && (
+              <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+                <p className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">
+                  <Camera className="size-4" />
+                  Control Anti-Fraude: Evidencia Fotográfica
+                </p>
+                <p className="mb-3 text-xs text-muted-foreground">Sube una foto del pedido empaquetado para protegerte ante reclamos falsos.</p>
+                
+                {isUploading ? (
+                  <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-primary/30 bg-primary/10">
+                    <Loader2 className="size-5 animate-spin text-primary" />
+                    <span className="ml-2 text-xs font-bold text-primary">Subiendo a Cloudinary...</span>
+                  </div>
+                ) : photoEvidence ? (
+                  <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-4 py-3">
+                    <span className="flex items-center gap-2 text-xs font-bold text-success">
+                      <CheckCircle2 className="size-4" /> Imagen guardada en la nube
+                    </span>
+                    <button onClick={() => setPhotoEvidence(null)} className="text-xs font-bold text-muted-foreground hover:underline">Eliminar</button>
+                  </div>
+                ) : (
+                  <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/10 text-sm font-bold text-primary hover:bg-primary/20 transition-colors">
+                    <Camera className="size-4" />
+                    Tomar foto del paquete
+                    {/* El atributo capture="environment" abre la cámara trasera del celular automáticamente */}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+                  </label>
+                )}
+              </div>
+            )}
 
             {hasSubstitutions && activeTab === 'pendientes' && (
               <div className="rounded-xl border border-brand-yellow bg-brand-yellow/5 p-4">
@@ -366,20 +457,45 @@ export function PedidosView() {
                 <button
                   type="button"
                   onClick={() => handleReady(selected)}
-                  className="flex h-16 w-full items-center justify-center gap-2 rounded-xl bg-success text-lg font-black text-success-foreground hover:brightness-95"
+                  disabled={!allPicked || !photoEvidence}
+                  className={cn(
+                    "flex h-16 w-full items-center justify-center gap-2 rounded-xl text-lg font-black transition-all",
+                    allPicked && photoEvidence
+                      ? "bg-success text-success-foreground hover:brightness-95 shadow-lg shadow-success/20"
+                      : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                  )}
                 >
                   <CheckCircle2 className="size-6" />
-                  1. Marcar Pedido como Listo (Terminado de armar)
+                  1. Marcar Pedido como Listo
                 </button>
+                {(!allPicked || !photoEvidence) && (
+                  <p className="mt-2 text-center text-xs font-semibold text-destructive">
+                    {!allPicked ? "Falta marcar productos." : "Falta adjuntar evidencia fotográfica."}
+                  </p>
+                )}
               </div>
             )}
 
             {activeTab === 'listos' && (
-              <div className="mt-auto">
+              <div className="mt-auto grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setScannerOpen(true)}
+                  className="flex h-16 items-center justify-center gap-2 rounded-xl bg-brand-yellow text-lg font-black text-brand-yellow-foreground hover:brightness-95 shadow-lg shadow-brand-yellow/20"
+                >
+                  <QrCode className="size-6" />
+                  Escanear / Ingresar Código
+                </button>
                 <button
                   type="button"
                   onClick={() => handleDeliver(selected.id)}
-                  className="flex h-16 w-full items-center justify-center gap-2 rounded-xl bg-primary text-lg font-black text-primary-foreground hover:brightness-110 transition-all shadow-lg"
+                  disabled={!validated[selected.id]}
+                  className={cn(
+                    "flex h-16 items-center justify-center gap-2 rounded-xl text-lg font-black transition-all",
+                    validated[selected.id] 
+                      ? "bg-success text-success-foreground hover:brightness-95 shadow-lg shadow-success/20" 
+                      : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
+                  )}
                 >
                   <PackageCheck className="size-6" />
                   2. Confirmar Entrega
@@ -394,6 +510,107 @@ export function PedidosView() {
           </div>
         )}
       </section>
+
+      {/* MODAL CON CÁMARA REAL Y TECLADO ESTABLE */}
+      {scannerOpen && selected && (
+        <QrScannerModal
+          orderId={selected.id}
+          securityCode={selected.securityCode || ''}
+          onValidated={() => {
+            setValidated((v) => ({ ...v, [selected.id]: true }))
+            setScannerOpen(false)
+          }}
+          onClose={() => setScannerOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function QrScannerModal({
+  orderId,
+  securityCode,
+  onValidated,
+  onClose,
+}: {
+  orderId: string
+  securityCode: string
+  onValidated: () => void
+  onClose: () => void
+}) {
+  // Input NO controlado mediante useRef, el teclado numérico de tu celular ya NO se cerrará
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [error, setError] = useState('')
+
+  const handleManualValidation = () => {
+    const manualCode = inputRef.current?.value.trim() || ''
+    
+    if (securityCode === '') {
+      setError('Aún no hay código en el Excel. Vuelva a intentar.')
+      return
+    }
+    
+    if (manualCode === securityCode.trim()) {
+      onValidated()
+    } else {
+      setError('Código incorrecto. Verifique los 4 dígitos del cliente.')
+    }
+  }
+
+  const handleScan = (data: string | null) => {
+    if (data) {
+      if (securityCode !== '' && data.includes(securityCode.trim())) {
+        onValidated()
+      } else {
+        setError('El código QR escaneado no es válido para este pedido.')
+      }
+    }
+  }
+
+  return (
+    <div className="dark">
+      <Modal open onClose={onClose} title="Validar Entrega" className="max-w-md bg-card">
+        <div className="flex flex-col gap-6 p-6">
+          
+          <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black border border-white/10 flex flex-col items-center justify-center">
+             <QrReader
+                onResult={(result: any) => {
+                  if (!!result) {
+                    handleScan(result?.getText())
+                  }
+                }}
+                constraints={{ facingMode: 'environment' }}
+                containerStyle={{ width: '100%', height: '100%' }}
+                videoStyle={{ objectFit: 'cover' }}
+             />
+             <div className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
+          </div>
+
+          <div className="space-y-4 border-t border-border pt-6">
+             <p className="text-center text-sm font-bold text-muted-foreground flex items-center justify-center gap-2">
+               <Keyboard className="size-4" /> Validación Alternativa (Código Typebot)
+             </p>
+             <div className="flex gap-2">
+               <input 
+                 ref={inputRef}
+                 type="text" 
+                 inputMode="numeric"
+                 placeholder="Ej: 1234"
+                 maxLength={4}
+                 onChange={() => setError('')}
+                 className="flex-1 rounded-xl border border-input bg-background px-4 text-center text-2xl tracking-widest font-black text-white focus:border-primary focus:outline-none"
+               />
+               <button 
+                 onClick={handleManualValidation}
+                 className="rounded-xl bg-brand-yellow px-6 font-bold text-brand-yellow-foreground hover:brightness-110 transition-all"
+               >
+                 Validar
+               </button>
+             </div>
+             {error && <p className="text-center text-sm font-bold text-destructive">{error}</p>}
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
