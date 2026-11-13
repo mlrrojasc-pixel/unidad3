@@ -25,7 +25,6 @@ import { formatPrice, sedeShort } from '@/lib/store-data'
 import { useStore, type Complaint } from '@/components/store-provider'
 import { PaymentSection, type ConfirmedOrder } from '@/components/cliente/payment-section'
 
-// CAMBIA AQUÍ TU NÚMERO PERSONAL CON EL 51 DELANTE
 const NUMERO_WHATSAPP = '51904827537'
 
 export function CartPage() {
@@ -33,38 +32,12 @@ export function CartPage() {
   const [confirmed, setConfirmed] = useState<ConfirmedOrder | null>(null)
 
   const procesarYGuardarPedido = async (orden: ConfirmedOrder) => {
+    // SOLUCIÓN AL DUPLICADO: Eliminamos el fetch a SheetDB aquí. 
+    // store-provider.tsx ya se encarga de enviarlo completo.
     setConfirmed(orden)
-
-        try {
-      await fetch('https://sheetdb.io/api/v1/5f2glnefammpr', {
-        method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-       body: JSON.stringify({
-          data: [
-            {
-                'ID de Pedido': orden.orderId,
-              'Cliente': orden.customer,
-              'Celular': orden.phoneNumber,
-              'Horario de Recojo': orden.pickupTime,
-              'Estado': 'Compra confirmada',
-              'Sustitución': orden.substituted > 0 ? 'Aprobada' : 'Ninguna',
-              'Reembolso': '-',
-              'Calificación 1-5': '',
-              'Código QR': '',
-            },
-          ],
-        }),
-      })
-    } catch (error) {
-      console.error('Error al conectar con Excel', error)
-    }
   }
           
   if (confirmed) {
-    // SOLO ENVÍA EL ID PORQUE EL EXCEL YA TIENE SU NOMBRE Y HORARIO
     const mensajeCorto = `Hola La Cosmina, mi ID de pedido es ${confirmed.orderId}. Solicito mi código de seguridad.`
     const enlaceWhatsApp = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensajeCorto)}`
 
@@ -277,14 +250,12 @@ function CustomerOrdersAndComplaints() {
   const [complaintImage, setComplaintImage] = useState<string>('')
   const [sentSuccess, setSentSuccess] = useState(false)
 
-  // Unimos todos los pedidos con su estado actual
   const allOrders = [
     ...orders.map((o) => ({ ...o, statusLabel: 'En preparación en tienda', statusTone: 'bg-brand-yellow/20 text-foreground', substitutionNote: undefined })),
     ...completedOrders.map((o) => ({ ...o, statusLabel: 'Listo para recoger', statusTone: 'bg-success/15 text-success' })),
     ...deliveredOrders.map((o) => ({ ...o, statusLabel: 'Entregado al cliente', statusTone: 'bg-primary/15 text-primary' })),
   ]
 
-  // Solo cargar los pedidos si el usuario inició sesión
   const myOrders = user
     ? allOrders.filter((o) => o.customer.toLowerCase() === `${user.firstName} ${user.lastName}`.toLowerCase())
     : []
@@ -323,7 +294,6 @@ function CustomerOrdersAndComplaints() {
 
   return (
     <div className="mt-12 grid w-full gap-8 border-t border-border pt-10 text-left lg:grid-cols-2">
-      {/* 1. SEGUIMIENTO DE PEDIDOS */}
       <section className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center gap-2.5">
           <PackageCheck className="size-6 text-primary" />
@@ -374,7 +344,6 @@ function CustomerOrdersAndComplaints() {
         )}
       </section>
 
-      {/* 2. LIBRO DE RECLAMACIONES Y REEMBOLSOS (WEB + WHATSAPP) */}
       <section className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center gap-2.5">
           <BookOpen className="size-6 text-primary" />
@@ -507,7 +476,6 @@ function CustomerOrdersAndComplaints() {
                   </div>
                   <p className="mt-2 text-sm">{c.detail}</p>
                   
-                  {/* Respuesta del Administrador visible para el cliente */}
                   {c.resolutionStatus && (
                     <div className={cn("mt-3 rounded-lg border p-3 text-xs", c.resolutionStatus === 'Aprobado' ? 'border-success/30 bg-success/10 text-success-foreground' : 'border-destructive/30 bg-destructive/10 text-destructive-foreground')}>
                       <p className={cn("font-black uppercase", c.resolutionStatus === 'Aprobado' ? 'text-success' : 'text-destructive')}>
