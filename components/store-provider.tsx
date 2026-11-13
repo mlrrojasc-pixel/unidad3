@@ -13,7 +13,8 @@ import {
 } from '@/lib/store-data'
 
 export type PaymentMethod = Order['payment']
-export type AppOrder = Order & { pickupTime?: string; securityCode?: string }
+// Agregamos evidencePhoto
+export type AppOrder = Order & { pickupTime?: string; securityCode?: string; evidencePhoto?: string }
 
 export interface CartLine {
   product: Product
@@ -101,6 +102,7 @@ interface StoreContextValue {
   readyCount: number
   completeOrder: (id: string, substitutionNote?: string) => void
   deliverOrder: (id: string) => void
+  saveEvidence: (id: string, url: string) => void
   addComplaint: (data: Omit<Complaint, 'id' | 'createdAt'>) => void
   resolveComplaint: (id: string, status: 'Aprobado' | 'Rechazado', text: string) => void
   addTicket: (topic: string, detail: string, urgent: boolean) => void
@@ -171,76 +173,68 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             password: fila['contraseña'] || ''
           }))
           setAccounts(cuentasSincronizadas)
-          if (typeof window !== 'undefined') {
-            window.localStorage.setItem('lacosmina_accounts', JSON.stringify(cuentasSincronizadas))
-          }
+          if (typeof window !== 'undefined') window.localStorage.setItem('lacosmina_accounts', JSON.stringify(cuentasSincronizadas))
         }
       }).catch(() => {})
   }, [])
 
-  // SISTEMA ANTIDUPLICADOS Y LECTURA SEGURA DEL CÓDIGO QR
+  // SOLUCIÓN VISTA GLOBAL: Se eliminó el filtro ?Celular= para descargar TODOS los pedidos y verlos en Admin/Empleado
   useEffect(() => {
-    if (user && user.phone) {
-      fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/search?Celular=${user.phone}`)
-        .then(res => res.json())
-        .then(data => {
-          if (Array.isArray(data) && data.length > 0) {
-            const orderMap = new Map();
+    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr`)
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data) && data.length > 0) {
+          const orderMap = new Map();
 
-            data.forEach((fila: any) => {
-              const id = fila['ID de Pedido'];
-              if (!id) return;
+          data.forEach((fila: any) => {
+            const id = fila['ID de Pedido'];
+            if (!id) return;
 
-              let itemsParsed = [];
-              try { 
-                itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : [];
-              } catch(e) {}
+            let itemsParsed = [];
+            try { itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : []; } catch(e) {}
+            if (orderMap.has(id) && itemsParsed.length === 0) return;
 
-              // Si ya existe en el mapa y esta fila actual está vacía, la ignoramos.
-              if (orderMap.has(id) && itemsParsed.length === 0) return;
+            // SOLUCIÓN AL APÓSTROFE DE TYPEBOT: Limpiamos las comillas y apóstrofes directamente al leer la base de datos
+            const rawCode = String(fila['Código QR'] ?? fila['Codigo QR'] ?? '').replace(/['"]/g, '').trim();
 
-              // Evita que SheetDB rompa el código si lo envía como número y busca posibles variantes del título
-              const rawCode = fila['Código QR'] ?? fila['Codigo QR'] ?? fila['Codigo qr'] ?? '';
-              const securityCode = String(rawCode).trim();
+            const baseOrder: AppOrder = {
+              id,
+              customer: fila['Cliente'] || '',
+              sede: SEDES[0],
+              payment: 'Tarjeta',
+              pickupTime: fila['Horario de Recojo'] || '',
+              slaSeconds: 1800,
+              deadline: Date.now() + 1800000,
+              substitution: fila['Sustitución'] !== 'Ninguna',
+              items: itemsParsed,
+              securityCode: rawCode,
+              evidencePhoto: fila['Evidencia'] || '', // Nueva columna
+            }
 
-              const baseOrder: AppOrder = {
-                id,
-                customer: fila['Cliente'] || '',
-                sede: SEDES[0],
-                payment: 'Tarjeta',
-                pickupTime: fila['Horario de Recojo'] || '',
-                slaSeconds: 1800,
-                deadline: Date.now() + 1800000,
-                substitution: fila['Sustitución'] !== 'Ninguna',
-                items: itemsParsed,
-                securityCode: securityCode,
-              }
+            orderMap.set(id, { baseOrder, estado: fila['Estado'], hora: fila['Hora de Entrega'] });
+          })
 
-              orderMap.set(id, { baseOrder, estado: fila['Estado'], hora: fila['Hora de Entrega'] });
-            })
+          const activos: AppOrder[] = [];
+          const completados: CompletedOrder[] = [];
+          const entregados: CompletedOrder[] = [];
 
-            const activos: AppOrder[] = [];
-            const completados: CompletedOrder[] = [];
-            const entregados: CompletedOrder[] = [];
+          orderMap.forEach(({ baseOrder, estado, hora }) => {
+            if (estado === 'Entregado') {
+              entregados.push({ ...baseOrder, deliveredAt: hora || 'Hora no registrada' } as CompletedOrder)
+            } else if (estado === 'Listo para recoger') {
+              completados.push({ ...baseOrder, readyAt: 'Listo' } as CompletedOrder)
+            } else {
+              activos.push(baseOrder as AppOrder)
+            }
+          });
 
-            orderMap.forEach(({ baseOrder, estado, hora }) => {
-              if (estado === 'Entregado') {
-                entregados.push({ ...baseOrder, deliveredAt: hora || 'Hora no registrada' } as CompletedOrder)
-              } else if (estado === 'Listo para recoger') {
-                completados.push({ ...baseOrder, readyAt: 'Listo' } as CompletedOrder)
-              } else {
-                activos.push(baseOrder as AppOrder)
-              }
-            });
-
-            setOrders(activos)
-            setCompletedOrders(completados)
-            setDeliveredOrders(entregados)
-          }
-        })
-        .catch(error => console.error('Error al sincronizar pedidos:', error))
-    }
-  }, [user])
+          setOrders(activos)
+          setCompletedOrders(completados)
+          setDeliveredOrders(entregados)
+        }
+      })
+      .catch(error => console.error('Error al sincronizar pedidos:', error))
+  }, [user]) // Se ejecuta al cargar la app y al loguearse
 
   useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_cart', JSON.stringify(cartQty)) }, [cartQty, hydrated])
   useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_sede', JSON.stringify(sede)) }, [sede, hydrated])
@@ -312,7 +306,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const cleanEmail = email.trim().toLowerCase()
     const cleanPassword = password.trim()
     const account = accounts.find((a) => a.email.trim().toLowerCase() === cleanEmail)
-    
     if (!account) return 'No existe ninguna cuenta registrada con este correo.'
     if (account.password.trim() !== cleanPassword) return 'Contraseña incorrecta.'
     
@@ -360,6 +353,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const unavailableCount = cart.filter((l) => !l.available).length
   const qtyInCart = useCallback((id: string) => cartQty[id] ?? 0, [cartQty])
 
+  // NUEVO: Función para actualizar la evidencia fotográfica
+  const saveEvidence = useCallback((id: string, url: string) => {
+    const updatePhoto = (prev: any[]) => prev.map((o) => (o.id === id ? { ...o, evidencePhoto: url } : o))
+    setOrders(updatePhoto)
+    setCompletedOrders(updatePhoto)
+    setDeliveredOrders(updatePhoto)
+
+    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
+      method: 'PATCH',
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: { 'Evidencia': url } })
+    }).catch(() => {})
+  }, [])
+
   const completeOrder = useCallback((id: string, substitutionNote?: string) => {
     setOrders((prev) => {
       const orderToComplete = prev.find((o) => o.id === id)
@@ -383,9 +390,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCompletedOrders((prev) => {
       const orderToDeliver = prev.find((o) => o.id === id)
       if (orderToDeliver) {
-        // HORA EXACTA Y FORMATO LIMPIO
         const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
-        
         setDeliveredOrders((dPrev) => [{ ...orderToDeliver, deliveredAt: nowStr }, ...dPrev.filter((item) => item.id !== id)])
         
         fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
@@ -465,7 +470,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const newOrder: AppOrder = {
       id, customer, sede, payment, pickupTime, slaSeconds,
       deadline: Date.now() + slaSeconds * 1000,
-      substitution, items: itemsToSave,
+      substitution, items: itemsToSave, evidencePhoto: ''
     }
 
     setOrders((prev) => [...prev, newOrder])
@@ -485,6 +490,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           'Reembolso': '-',
           'Detalle': JSON.stringify(itemsToSave),
           'Hora de Entrega': '',
+          'Evidencia': '',
         }]
       })
     }).catch(console.error)
@@ -496,7 +502,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     startShift, products, setStock, setStockAllSedes, user, register, login, logout, authMode, openAuth,
     closeAuth, unavailableCount, cart, cartCount, cartTotal, qtyInCart, addToCart, updateQty, clearCart,
     search, setSearch, category, setCategory, sede, setSede, orders, completedOrders, deliveredOrders,
-    complaints, tickets, readyCount, completeOrder, deliverOrder, addComplaint, resolveComplaint, addTicket,
+    complaints, tickets, readyCount, completeOrder, deliverOrder, saveEvidence, addComplaint, resolveComplaint, addTicket,
     resolveTicket, placeOrder, toast, showToast,
   }
 
@@ -508,3 +514,4 @@ export function useStore() {
   if (!ctx) throw new Error('useStore debe usarse dentro de StoreProvider')
   return ctx
 }
+    
