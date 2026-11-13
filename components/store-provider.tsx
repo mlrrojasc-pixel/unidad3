@@ -13,7 +13,6 @@ import {
 } from '@/lib/store-data'
 
 export type PaymentMethod = Order['payment']
-// Agregamos evidencePhoto
 export type AppOrder = Order & { pickupTime?: string; securityCode?: string; evidencePhoto?: string }
 
 export interface CartLine {
@@ -100,7 +99,7 @@ interface StoreContextValue {
   complaints: Complaint[]
   tickets: SupportTicket[]
   readyCount: number
-  completeOrder: (id: string, substitutionNote?: string) => void
+  completeOrder: (id: string, substitutionNote?: string, photoUrl?: string) => void
   deliverOrder: (id: string) => void
   saveEvidence: (id: string, url: string) => void
   addComplaint: (data: Omit<Complaint, 'id' | 'createdAt'>) => void
@@ -161,7 +160,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setAccounts(cuentasLocales)
     setHydrated(true)
 
-    fetch('https://sheetdb.io/api/v1/zl6r1yt4h5voo')
+    fetch(`https://sheetdb.io/api/v1/0793nb34hurdw?nocache=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -178,9 +177,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }).catch(() => {})
   }, [])
 
-  // SOLUCIÓN VISTA GLOBAL: Se eliminó el filtro ?Celular= para descargar TODOS los pedidos y verlos en Admin/Empleado
+  // VISTA GLOBAL: Cargamos todos los pedidos
   useEffect(() => {
-    fetch(`https://sheetdb.io/api/v1/k78fylj6v3892`)
+    // 1. SOLUCIÓN AL CACHÉ: Añadimos nocache y cache: 'no-store'
+    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr?nocache=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -194,8 +194,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             try { itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : []; } catch(e) {}
             if (orderMap.has(id) && itemsParsed.length === 0) return;
 
-            // SOLUCIÓN AL APÓSTROFE DE TYPEBOT: Limpiamos las comillas y apóstrofes directamente al leer la base de datos
-            const rawCode = String(fila['Código QR'] ?? fila['Codigo QR'] ?? '').replace(/['"]/g, '').trim();
+            // 2. SOLUCIÓN A LA COLUMNA OCULTA: Buscamos la columna de QR dinámicamente por si tiene saltos de línea
+            const filaKeys = Object.keys(fila);
+            const qrKey = filaKeys.find(k => k.toLowerCase().includes('qr')) || 'Código QR';
+            const evidenciaKey = filaKeys.find(k => k.toLowerCase().includes('evidencia')) || 'Evidencia';
+
+            // Limpiamos los apóstrofes y espacios
+            const rawCode = String(fila[qrKey] ?? '').replace(/['"\s]/g, '').trim();
+            const evidenciaUrl = String(fila[evidenciaKey] ?? '').trim();
 
             const baseOrder: AppOrder = {
               id,
@@ -208,7 +214,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
               substitution: fila['Sustitución'] !== 'Ninguna',
               items: itemsParsed,
               securityCode: rawCode,
-              evidencePhoto: fila['Evidencia'] || '', // Nueva columna
+              evidencePhoto: evidenciaUrl || (typeof window !== 'undefined' ? window.localStorage.getItem(`evidencia_${id}`) : '') || '', 
             }
 
             orderMap.set(id, { baseOrder, estado: fila['Estado'], hora: fila['Hora de Entrega'] });
@@ -234,7 +240,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch(error => console.error('Error al sincronizar pedidos:', error))
-  }, [user]) // Se ejecuta al cargar la app y al loguearse
+  }, [user])
 
   useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_cart', JSON.stringify(cartQty)) }, [cartQty, hydrated])
   useEffect(() => { if (hydrated) window.localStorage.setItem('lacosmina_sede', JSON.stringify(sede)) }, [sede, hydrated])
@@ -285,7 +291,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const { password: _password, ...customer } = account
     setUser(customer)
 
-    fetch('https://sheetdb.io/api/v1/zl6r1yt4h5voo', {
+    fetch('https://sheetdb.io/api/v1/0793nb34hurdw', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -353,36 +359,37 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const unavailableCount = cart.filter((l) => !l.available).length
   const qtyInCart = useCallback((id: string) => cartQty[id] ?? 0, [cartQty])
 
-  // NUEVO: Función para actualizar la evidencia fotográfica
   const saveEvidence = useCallback((id: string, url: string) => {
     const updatePhoto = (prev: any[]) => prev.map((o) => (o.id === id ? { ...o, evidencePhoto: url } : o))
     setOrders(updatePhoto)
     setCompletedOrders(updatePhoto)
     setDeliveredOrders(updatePhoto)
 
-    fetch(`https://sheetdb.io/api/v1/k78fylj6v3892/ID%20de%20Pedido/${id}`, {
+    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
       method: 'PATCH',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: { 'Evidencia': url } })
     }).catch(() => {})
   }, [])
 
-  const completeOrder = useCallback((id: string, substitutionNote?: string) => {
+  const completeOrder = useCallback((id: string, substitutionNote?: string, photoUrl?: string) => {
     setOrders((prev) => {
       const orderToComplete = prev.find((o) => o.id === id)
       if (orderToComplete) {
         const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit' })
-        setCompletedOrders((cPrev) => [{ ...orderToComplete, substitutionNote, readyAt: nowStr }, ...cPrev.filter((item) => item.id !== id)])
+        setCompletedOrders((cPrev) => [{ ...orderToComplete, substitutionNote, evidencePhoto: photoUrl || orderToComplete.evidencePhoto, readyAt: nowStr }, ...cPrev.filter((item) => item.id !== id)])
       }
       return prev.filter((o) => o.id !== id)
     })
     setReadyCount((n) => n + 1)
     showToast(`Pedido ${id} listo para recojo`)
 
-    fetch(`https://sheetdb.io/api/v1/k78fylj6v3892/ID%20de%20Pedido/${id}`, {
+    if (photoUrl && typeof window !== 'undefined') window.localStorage.setItem(`evidencia_${id}`, photoUrl);
+
+    fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
       method: 'PATCH',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: { 'Estado': 'Listo para recoger' } })
+      body: JSON.stringify({ data: { 'Estado': 'Listo para recoger', 'Evidencia': photoUrl || '' } })
     }).catch(() => {})
   }, [showToast])
 
@@ -393,7 +400,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
         setDeliveredOrders((dPrev) => [{ ...orderToDeliver, deliveredAt: nowStr }, ...dPrev.filter((item) => item.id !== id)])
         
-        fetch(`https://sheetdb.io/api/v1/k78fylj6v3892/ID%20de%20Pedido/${id}`, {
+        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
           method: 'PATCH',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: { 'Estado': 'Entregado', 'Hora de Entrega': nowStr } })
@@ -420,7 +427,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const target = next.find(c => c.id === id);
       
       if (target && target.orderId) {
-        fetch(`https://sheetdb.io/api/v1/k78fylj6v3892/ID%20de%20Pedido/${target.orderId}`, {
+        fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${target.orderId}`, {
           method: 'PATCH',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: { 'Reembolso': status === 'Aprobado' ? 'Reembolso procesado' : 'Rechazado' } })
@@ -476,7 +483,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setOrders((prev) => [...prev, newOrder])
     setCartQty({})
 
-    fetch('https://sheetdb.io/api/v1/k78fylj6v3892', {
+    fetch('https://sheetdb.io/api/v1/5f2glnefammpr', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -491,6 +498,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
           'Detalle': JSON.stringify(itemsToSave),
           'Hora de Entrega': '',
           'Evidencia': '',
+          'Código QR': '',
         }]
       })
     }).catch(console.error)
@@ -514,4 +522,3 @@ export function useStore() {
   if (!ctx) throw new Error('useStore debe usarse dentro de StoreProvider')
   return ctx
 }
-    
