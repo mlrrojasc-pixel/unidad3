@@ -14,7 +14,6 @@ import {
 
 export type PaymentMethod = Order['payment']
 
-// NUEVO: Agregamos securityCode a la interfaz
 export type AppOrder = Order & { pickupTime?: string; securityCode?: string }
 
 export interface CartLine {
@@ -208,7 +207,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                 itemsParsed = fila['Detalle'] ? JSON.parse(fila['Detalle']) : [] 
               } catch(e) {}
 
-              // NUEVO: Agregamos el securityCode leyendo "Código QR"
               const baseOrder: AppOrder = {
                 id: fila['ID de Pedido'],
                 customer: fila['Cliente'],
@@ -219,11 +217,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
                 deadline: Date.now() + 1800000,
                 substitution: fila['Sustitución'] !== 'Ninguna',
                 items: itemsParsed,
-                securityCode: fila['Código QR'] || '', 
+                // SOLUCIÓN AL CÓDIGO TYPEBOT: Lo forzamos a ser un texto (String)
+                securityCode: fila['Código QR'] ? String(fila['Código QR']).trim() : '', 
               }
 
               if (fila['Estado'] === 'Entregado') {
-                // NUEVO: Extraemos la hora real para evitar "Entregado Entregado"
                 entregados.push({ ...baseOrder, deliveredAt: fila['Hora de Entrega'] || '' } as CompletedOrder)
               } else if (fila['Estado'] === 'Listo para recoger') {
                 completados.push({ ...baseOrder, readyAt: 'Listo' } as CompletedOrder)
@@ -382,12 +380,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCompletedOrders((prev) => {
       const orderToDeliver = prev.find((o) => o.id === id)
       if (orderToDeliver) {
-        // NUEVO: Calculamos la hora exacta de la entrega
         const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
         
         setDeliveredOrders((dPrev) => [{ ...orderToDeliver, deliveredAt: nowStr }, ...dPrev.filter((item) => item.id !== id)])
         
-        // Enviamos la hora exacta a SheetDB para que quede registrada
         fetch(`https://sheetdb.io/api/v1/5f2glnefammpr/ID%20de%20Pedido/${id}`, {
           method: 'PATCH',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
