@@ -16,7 +16,8 @@ import {
   RefreshCw,
   Search,
   AlertTriangle,
-  Wallet
+  Wallet,
+  Camera
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/components/store-provider'
@@ -37,7 +38,6 @@ export function AdminView() {
   const totalOrders = allOrders.length || 1
   const totalSales = deliveredOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.price * i.qty, 0), 0)
   
-  // SOLUCIÓN AL CÁLCULO DE SUSTITUCIÓN (Calcula items agotados vs items totales)
   const totalItemsSold = allOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.qty, 0), 0) || 1;
   const totalItemsSubstituted = allOrders.reduce((sum, o) => sum + o.items.filter(i => i.substitute).reduce((s, i) => s + i.qty, 0), 0);
   const substitutionRate = Math.round((totalItemsSubstituted / totalItemsSold) * 100);
@@ -146,83 +146,106 @@ export function AdminView() {
                   <p className="text-sm">No hay quejas ni solicitudes de reembolso pendientes.</p>
                 </div>
               ) : (
-                <div className="grid gap-6 lg:grid-cols-2">
-                  {complaints.map((c) => (
-                    <div key={c.id} className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141419] shadow-xl">
-                      <div className="flex items-start justify-between border-b border-white/10 bg-black/20 p-5">
-                        <div>
-                          <span className="text-xl font-black text-white">{c.id}</span>
-                          <p className="text-sm text-muted-foreground">Pedido afectado: <strong className="text-primary">{c.orderId}</strong></p>
-                        </div>
-                        <span className="rounded-full bg-primary/20 px-3 py-1 text-xs font-bold text-primary border border-primary/20">{c.type}</span>
-                      </div>
-                      <div className="p-5">
-                        <p className="text-base font-bold text-white">{c.customer}</p>
-                        <p className="text-xs text-muted-foreground">{c.email} · Registrado el {c.createdAt}</p>
-                        <div className="mt-4 rounded-xl bg-white/5 p-4 text-sm text-white/90 leading-relaxed border border-white/5">
-                          "{c.detail}"
-                        </div>
-                        
-                        <div className="mt-4 flex items-center gap-3 rounded-xl border border-dashed border-white/20 bg-black/40 p-4">
-                          {c.image ? (
-                            <>
-                              <div 
-                                className="size-14 shrink-0 rounded-lg border border-white/10 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
-                                onClick={() => setSelectedImage(c.image!)}
-                              >
-                                <img src={c.image} alt="Evidencia" className="size-full object-cover" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-success flex items-center gap-1.5"><CheckCircle2 className="size-4" /> Evidencia adjunta</p>
-                                <button onClick={() => setSelectedImage(c.image!)} className="text-xs font-semibold text-primary hover:underline mt-0.5">Haga clic aquí para ampliar fotografía</button>
-                              </div>
-                            </>
-                          ) : (
-                            <>
-                              <div className="flex size-12 items-center justify-center rounded-lg bg-white/5">
-                                <ImageIcon className="size-6 text-white/30" />
-                              </div>
-                              <div>
-                                <p className="text-sm font-bold text-white/50">Sin evidencia adjunta</p>
-                                <p className="text-xs text-muted-foreground">El cliente no subió fotografía.</p>
-                              </div>
-                            </>
-                          )}
-                        </div>
+                <div className="grid gap-6 xl:grid-cols-2">
+                  {complaints.map((c) => {
+                    const relatedOrder = allOrders.find(o => o.id === c.orderId);
+                    const employeeEvidence = relatedOrder?.evidencePhoto || null;
 
-                        {c.resolutionStatus ? (
-                          <div className={cn("mt-6 rounded-xl border p-5", c.resolutionStatus === 'Aprobado' ? 'border-success/30 bg-success/10' : 'border-destructive/30 bg-destructive/10')}>
-                            <p className={cn("text-xs font-black uppercase tracking-wider flex items-center gap-2", c.resolutionStatus === 'Aprobado' ? 'text-success' : 'text-destructive')}>
-                              {c.resolutionStatus === 'Aprobado' ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}
-                              {c.resolutionStatus === 'Aprobado' ? 'Reembolso Aprobado' : 'Reclamo Rechazado'}
-                            </p>
-                            <p className="mt-2 text-sm text-white/90 leading-relaxed">{c.resolutionText}</p>
+                    return (
+                      <div key={c.id} className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#141419] shadow-xl">
+                        <div className="flex items-start justify-between border-b border-white/10 bg-black/20 p-5">
+                          <div>
+                            <span className="text-xl font-black text-white">{c.id}</span>
+                            <p className="text-sm text-muted-foreground">Pedido afectado: <strong className="text-primary">{c.orderId}</strong></p>
                           </div>
-                        ) : (
-                          <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
-                            <label className="text-xs font-bold text-brand-yellow flex items-center gap-1.5">
-                              <ShieldAlert className="size-4" /> Resolución (Actualizará Excel y Visor Web)
-                            </label>
-                            <textarea 
-                              value={replyTexts[c.id] || ''}
-                              onChange={(e) => setReplyTexts(prev => ({ ...prev, [c.id]: e.target.value }))}
-                              placeholder="Ej: Tras revisar la evidencia, se procederá con el extorno de S/ 25.00 a la cuenta original..."
-                              className="w-full rounded-xl border border-white/10 bg-black/60 p-4 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-muted-foreground/50 transition-colors"
-                              rows={3}
-                            />
-                            <div className="flex gap-3">
-                              <button onClick={() => handleResolveComplaint(c.id, 'Aprobado')} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-success py-3.5 text-sm font-bold text-success-foreground hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-success/20">
-                                <CheckCircle2 className="size-4" /> Aprobar Reembolso
-                              </button>
-                              <button onClick={() => handleResolveComplaint(c.id, 'Rechazado')} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/20 bg-transparent py-3.5 text-sm font-bold text-white hover:bg-white/10 active:scale-95 transition-all">
-                                <XCircle className="size-4" /> Rechazar
-                              </button>
+                          <span className="rounded-full bg-primary/20 px-3 py-1 text-xs font-bold text-primary border border-primary/20">{c.type}</span>
+                        </div>
+                        <div className="p-5">
+                          <p className="text-base font-bold text-white">{c.customer}</p>
+                          <p className="text-xs text-muted-foreground">{c.email} · Registrado el {c.createdAt}</p>
+                          <div className="mt-4 rounded-xl bg-white/5 p-4 text-sm text-white/90 leading-relaxed border border-white/5">
+                            "{c.detail}"
+                          </div>
+                          
+                          {/* COMPARACIÓN DE EVIDENCIAS: CLIENTE VS EMPLEADO */}
+                          <div className="mt-4 grid grid-cols-2 gap-4">
+                            {/* Evidencia del Cliente */}
+                            <div className="flex flex-col gap-2 rounded-xl border border-dashed border-white/20 bg-black/40 p-3">
+                              <p className="text-[10px] font-bold uppercase text-muted-foreground">Prueba del Cliente</p>
+                              {c.image ? (
+                                <div className="flex items-center gap-2">
+                                  <div onClick={() => setSelectedImage(c.image!)} className="size-10 shrink-0 rounded-lg border border-white/10 overflow-hidden cursor-pointer hover:opacity-80">
+                                    <img src={c.image} alt="Cliente" className="size-full object-cover" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-success flex items-center gap-1"><CheckCircle2 className="size-3" /> Adjunto</p>
+                                    <button onClick={() => setSelectedImage(c.image!)} className="text-[10px] text-primary hover:underline mt-0.5">Ampliar</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 opacity-50">
+                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/5"><ImageIcon className="size-4 text-white/30" /></div>
+                                  <p className="text-[10px] font-medium text-white/50">Sin foto</p>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Evidencia del Empleado */}
+                            <div className="flex flex-col gap-2 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-3">
+                              <p className="text-[10px] font-bold uppercase text-primary">Control de Tienda</p>
+                              {employeeEvidence ? (
+                                <div className="flex items-center gap-2">
+                                  <div onClick={() => setSelectedImage(employeeEvidence)} className="size-10 shrink-0 rounded-lg border border-primary/20 overflow-hidden cursor-pointer hover:opacity-80">
+                                    <img src={employeeEvidence} alt="Tienda" className="size-full object-cover" />
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-bold text-primary flex items-center gap-1"><Camera className="size-3" /> Empacado</p>
+                                    <button onClick={() => setSelectedImage(employeeEvidence)} className="text-[10px] text-white hover:underline mt-0.5">Revisar foto</button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 opacity-50">
+                                  <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-white/5"><Camera className="size-4 text-white/30" /></div>
+                                  <p className="text-[10px] font-medium text-white/50">Sin foto</p>
+                                </div>
+                              )}
                             </div>
                           </div>
-                        )}
+
+                          {c.resolutionStatus ? (
+                            <div className={cn("mt-6 rounded-xl border p-5", c.resolutionStatus === 'Aprobado' ? 'border-success/30 bg-success/10' : 'border-destructive/30 bg-destructive/10')}>
+                              <p className={cn("text-xs font-black uppercase tracking-wider flex items-center gap-2", c.resolutionStatus === 'Aprobado' ? 'text-success' : 'text-destructive')}>
+                                {c.resolutionStatus === 'Aprobado' ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />}
+                                {c.resolutionStatus === 'Aprobado' ? 'Reembolso Aprobado' : 'Reclamo Rechazado'}
+                              </p>
+                              <p className="mt-2 text-sm text-white/90 leading-relaxed">{c.resolutionText}</p>
+                            </div>
+                          ) : (
+                            <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
+                              <label className="text-xs font-bold text-brand-yellow flex items-center gap-1.5">
+                                <ShieldAlert className="size-4" /> Resolución
+                              </label>
+                              <textarea 
+                                value={replyTexts[c.id] || ''}
+                                onChange={(e) => setReplyTexts(prev => ({ ...prev, [c.id]: e.target.value }))}
+                                placeholder="Ej: Tras revisar la foto de empaquetado de tienda, se verifica que los productos estaban completos..."
+                                className="w-full rounded-xl border border-white/10 bg-black/60 p-4 text-sm text-white focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none placeholder:text-muted-foreground/50 transition-colors"
+                                rows={3}
+                              />
+                              <div className="flex gap-3">
+                                <button onClick={() => handleResolveComplaint(c.id, 'Aprobado')} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-success py-3.5 text-sm font-bold text-success-foreground hover:brightness-110 active:scale-95 transition-all shadow-lg shadow-success/20">
+                                  <CheckCircle2 className="size-4" /> Aprobar Reembolso
+                                </button>
+                                <button onClick={() => handleResolveComplaint(c.id, 'Rechazado')} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/20 bg-transparent py-3.5 text-sm font-bold text-white hover:bg-white/10 active:scale-95 transition-all">
+                                  <XCircle className="size-4" /> Rechazar
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -348,7 +371,7 @@ export function AdminView() {
         </main>
       </div>
 
-      <Modal open={!!selectedImage} onClose={() => setSelectedImage(null)} title="Evidencia del Cliente" className="max-w-3xl bg-[#0f0f13] border border-white/10">
+      <Modal open={!!selectedImage} onClose={() => setSelectedImage(null)} title="Visor de Evidencias" className="max-w-3xl bg-[#0f0f13] border border-white/10">
         <div className="p-4 flex flex-col items-center">
           {selectedImage && (
             <div className="relative w-full h-[60vh] rounded-xl overflow-hidden bg-black/50 border border-white/10">
