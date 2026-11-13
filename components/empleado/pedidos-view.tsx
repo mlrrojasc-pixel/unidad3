@@ -88,6 +88,11 @@ export function PedidosView() {
   const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
   const [substitutionNote, setSubstitutionNote] = useState('')
   const [isUploading, setIsUploading] = useState(false)
+  const [localPhoto, setLocalPhoto] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLocalPhoto(null)
+  }, [selectedId, activeTab])
 
   const sorted = [...(orders as AppOrder[])].sort((a, b) => {
     const aUrgent = a.pickupTime === 'Lo antes posible (30 min)'
@@ -107,22 +112,47 @@ export function PedidosView() {
           : null
   ) as AppOrder | null
 
-  // MOCKEADOR DE CLOUDINARY
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>, orderId: string) => {
+  // CARGA REAL A TU CUENTA DE CLOUDINARY
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, orderId: string) => {
     const file = e.target.files?.[0]
-    if (file) {
-      setIsUploading(true)
-      setTimeout(() => {
-        setIsUploading(false)
-        const fakeUrl = `https://res.cloudinary.com/lacosmina/image/upload/v1/empaquetado_${orderId}.jpg`
-        saveEvidence(orderId, fakeUrl)
-      }, 2000)
+    if (!file) return
+
+    setIsUploading(true)
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    // TUS CREDENCIALES EXACTAS
+    formData.append('upload_preset', 'lacosmina') 
+    const cloudName = 'oa8smyy9' 
+
+    try {
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+        method: 'POST',
+        body: formData
+      })
+      const data = await res.json()
+      
+      if (data.secure_url) {
+        if (activeTab === 'pendientes') {
+          setLocalPhoto(data.secure_url)
+        } else {
+          saveEvidence(orderId, data.secure_url)
+        }
+      } else {
+        alert('Hubo un error subiendo la foto. Verifica tu Cloud Name y Upload Preset.')
+      }
+    } catch (error) {
+      console.error('Error Cloudinary', error)
+      alert('Error de conexión con Cloudinary.')
+    } finally {
+      setIsUploading(false)
     }
   }
 
   const handleReady = (order: Order) => {
-    completeOrder(order.id, substitutionNote.trim())
+    completeOrder(order.id, substitutionNote.trim(), localPhoto || undefined)
     setSubstitutionNote('')
+    setLocalPhoto(null)
     const index = sorted.findIndex((o) => o.id === order.id)
     const next = sorted[index + 1] ?? sorted[index - 1]
     setSelectedId(next?.id ?? null)
@@ -135,6 +165,7 @@ export function PedidosView() {
 
   const hasSubstitutions = selected?.items.some((item) => item.substitute)
   const allPicked = selected?.items.every((_, i) => picked[`${selected.id}-${i}`])
+  const currentPhoto = activeTab === 'pendientes' ? localPhoto : selected?.evidencePhoto;
 
   return (
     <div className="grid h-full min-h-0 md:grid-cols-[minmax(300px,390px)_1fr]">
@@ -382,7 +413,6 @@ export function PedidosView() {
               })}
             </ul>
 
-            {/* SECCIÓN EVIDENCIA VISIBLE EN TODAS LAS PESTAÑAS */}
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
               <p className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">
                 <Camera className="size-4" />
@@ -394,12 +424,20 @@ export function PedidosView() {
                   <Loader2 className="size-5 animate-spin text-primary" />
                   <span className="ml-2 text-xs font-bold text-primary">Subiendo a Cloudinary...</span>
                 </div>
-              ) : selected.evidencePhoto ? (
-                <div className="flex items-center justify-between rounded-lg border border-success/30 bg-success/10 px-4 py-3">
-                  <span className="flex items-center gap-2 text-xs font-bold text-success">
-                    <CheckCircle2 className="size-4" /> Foto de paquete guardada
-                  </span>
-                  <a href={selected.evidencePhoto} target="_blank" className="text-xs font-bold text-primary hover:underline flex items-center gap-1"><ImageIcon className="size-3" /> Ver imagen</a>
+              ) : currentPhoto ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/30 bg-success/10 px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <img src={currentPhoto} alt="Evidencia" className="size-10 rounded-md object-cover border border-success/20 shadow-sm" />
+                    <span className="flex items-center gap-1.5 text-xs font-bold text-success">
+                      <CheckCircle2 className="size-4" /> Foto guardada en la nube
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <a href={currentPhoto} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-primary hover:underline">Ver Foto</a>
+                    {activeTab === 'pendientes' && (
+                      <button onClick={() => setLocalPhoto(null)} className="text-xs font-bold text-muted-foreground hover:underline">Eliminar</button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <>
@@ -441,10 +479,10 @@ export function PedidosView() {
                 <button
                   type="button"
                   onClick={() => handleReady(selected)}
-                  disabled={!allPicked || !selected.evidencePhoto}
+                  disabled={!allPicked || !currentPhoto}
                   className={cn(
                     "flex h-16 w-full items-center justify-center gap-2 rounded-xl text-lg font-black transition-all",
-                    allPicked && selected.evidencePhoto
+                    allPicked && currentPhoto
                       ? "bg-success text-success-foreground hover:brightness-95 shadow-lg shadow-success/20"
                       : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
                   )}
@@ -452,7 +490,7 @@ export function PedidosView() {
                   <CheckCircle2 className="size-6" />
                   1. Marcar Pedido como Listo
                 </button>
-                {(!allPicked || !selected.evidencePhoto) && (
+                {(!allPicked || !currentPhoto) && (
                   <p className="mt-2 text-center text-xs font-semibold text-destructive">
                     {!allPicked ? "Falta marcar productos." : "Falta adjuntar evidencia fotográfica."}
                   </p>
@@ -531,7 +569,6 @@ function QrScannerModal({
       return
     }
     
-    // LIMPIEZA ADICIONAL: Eliminamos espacios accidentales
     if (manualCode === securityCode) {
       onValidated()
     } else {
