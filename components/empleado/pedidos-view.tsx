@@ -14,7 +14,9 @@ import {
   Keyboard,
   Camera,
   Loader2,
-  ImageIcon
+  ImageIcon,
+  X,
+  Plus
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatPrice, type Order } from '@/lib/store-data'
@@ -88,10 +90,13 @@ export function PedidosView() {
   const [activeTab, setActiveTab] = useState<EmployeeTab>('pendientes')
   const [substitutionNote, setSubstitutionNote] = useState('')
   const [isUploading, setIsUploading] = useState(false)
-  const [localPhoto, setLocalPhoto] = useState<string | null>(null)
+  
+  // SISTEMA MULTI-FOTO: Guardamos un array de imágenes temporales
+  const [localPhotos, setLocalPhotos] = useState<string[]>([])
 
   useEffect(() => {
-    setLocalPhoto(null)
+    setLocalPhotos([])
+    setSubstitutionNote('')
   }, [selectedId, activeTab])
 
   const sorted = [...(orders as AppOrder[])].sort((a, b) => {
@@ -112,6 +117,7 @@ export function PedidosView() {
           : null
   ) as AppOrder | null
 
+  // FOTOS A CLOUDINARY (MÚLTIPLES)
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>, orderId: string) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -119,7 +125,6 @@ export function PedidosView() {
     setIsUploading(true)
     const formData = new FormData()
     formData.append('file', file)
-    
     formData.append('upload_preset', 'lacosmina') 
     const cloudName = 'oa8smyy9' 
 
@@ -132,9 +137,11 @@ export function PedidosView() {
       
       if (data.secure_url) {
         if (activeTab === 'pendientes') {
-          setLocalPhoto(data.secure_url)
+          setLocalPhotos(prev => [...prev, data.secure_url])
         } else {
-          saveEvidence(orderId, data.secure_url)
+          // Si ya está listo o entregado, adjuntamos la nueva foto a las que ya existen en la base de datos
+          const existingPhotos = selected?.evidencePhoto ? selected.evidencePhoto.split(',') : []
+          saveEvidence(orderId, [...existingPhotos, data.secure_url].join(','))
         }
       } else {
         alert('Hubo un error subiendo la foto.')
@@ -147,10 +154,21 @@ export function PedidosView() {
     }
   }
 
+  const handleDeletePhoto = (urlToRemove: string, orderId: string) => {
+    if (activeTab === 'pendientes') {
+      setLocalPhotos(prev => prev.filter(url => url !== urlToRemove))
+    } else {
+      const existingPhotos = selected?.evidencePhoto ? selected.evidencePhoto.split(',') : []
+      const remainingPhotos = existingPhotos.filter(url => url !== urlToRemove)
+      saveEvidence(orderId, remainingPhotos.join(','))
+    }
+  }
+
   const handleReady = (order: Order) => {
-    completeOrder(order.id, substitutionNote.trim(), localPhoto || undefined)
+    // Almacenamos el array de URLs separado por comas
+    completeOrder(order.id, substitutionNote.trim(), localPhotos.length > 0 ? localPhotos.join(',') : undefined)
     setSubstitutionNote('')
-    setLocalPhoto(null)
+    setLocalPhotos([])
     const index = sorted.findIndex((o) => o.id === order.id)
     const next = sorted[index + 1] ?? sorted[index - 1]
     setSelectedId(next?.id ?? null)
@@ -163,7 +181,11 @@ export function PedidosView() {
 
   const hasSubstitutions = selected?.items.some((item) => item.substitute)
   const allPicked = selected?.items.every((_, i) => picked[`${selected.id}-${i}`])
-  const currentPhoto = activeTab === 'pendientes' ? localPhoto : selected?.evidencePhoto;
+  
+  // Fotos que se muestran en la UI
+  const currentPhotos = activeTab === 'pendientes' 
+    ? localPhotos 
+    : (selected?.evidencePhoto ? selected.evidencePhoto.split(',') : [])
 
   return (
     <div className="grid h-full min-h-0 md:grid-cols-[minmax(300px,390px)_1fr]">
@@ -411,35 +433,46 @@ export function PedidosView() {
               })}
             </ul>
 
+            {/* SECCIÓN MULTI-FOTO */}
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-              <p className="mb-2 flex items-center gap-2 text-sm font-bold text-primary">
-                <Camera className="size-4" />
-                Control Anti-Fraude: Evidencia Fotográfica
-              </p>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="flex items-center gap-2 text-sm font-bold text-primary">
+                  <Camera className="size-4" />
+                  Control Anti-Fraude: Evidencias Fotográficas
+                </p>
+                {currentPhotos.length > 0 && (
+                  <label className="flex cursor-pointer items-center gap-1.5 rounded-lg bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 transition-colors">
+                    <Plus className="size-3" /> Agregar
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handlePhotoUpload(e, selected.id)} />
+                  </label>
+                )}
+              </div>
               
-              {isUploading ? (
-                <div className="flex h-12 items-center justify-center rounded-lg border border-dashed border-primary/30 bg-primary/10">
-                  <Loader2 className="size-5 animate-spin text-primary" />
+              {isUploading && (
+                <div className="mb-3 flex h-10 items-center justify-center rounded-lg border border-dashed border-primary/30 bg-primary/10">
+                  <Loader2 className="size-4 animate-spin text-primary" />
                   <span className="ml-2 text-xs font-bold text-primary">Subiendo a Cloudinary...</span>
                 </div>
-              ) : currentPhoto ? (
-                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/30 bg-success/10 px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <img src={currentPhoto} alt="Evidencia" className="size-10 rounded-md object-cover border border-success/20 shadow-sm" />
-                    <span className="flex items-center gap-1.5 text-xs font-bold text-success">
-                      <CheckCircle2 className="size-4" /> Foto guardada en la nube
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <a href={currentPhoto} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-primary hover:underline">Ver Foto</a>
-                    {activeTab === 'pendientes' && (
-                      <button onClick={() => setLocalPhoto(null)} className="text-xs font-bold text-muted-foreground hover:underline">Eliminar</button>
-                    )}
-                  </div>
+              )}
+
+              {currentPhotos.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {currentPhotos.map((photo, idx) => (
+                    <div key={idx} className="group relative size-16 shrink-0 rounded-lg border border-success/30 shadow-sm overflow-hidden bg-black">
+                      <img src={photo} alt="Evidencia" className="size-full object-cover opacity-90 transition-opacity group-hover:opacity-50" />
+                      <button 
+                        onClick={() => handleDeletePhoto(photo, selected.id)} 
+                        className="absolute inset-0 flex items-center justify-center bg-black/60 opacity-0 transition-opacity group-hover:opacity-100"
+                        title="Eliminar foto"
+                      >
+                        <X className="size-5 text-white" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               ) : (
                 <>
-                  <p className="mb-3 text-xs text-muted-foreground">Sube una foto del pedido empaquetado para protegerte ante reclamos falsos.</p>
+                  <p className="mb-3 text-xs text-muted-foreground">Toma 1 o más fotos del pedido empaquetado para protegerte ante reclamos falsos.</p>
                   <label className="flex h-12 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-primary/50 bg-primary/10 text-sm font-bold text-primary hover:bg-primary/20 transition-colors">
                     <Camera className="size-4" />
                     Tomar foto del paquete
@@ -465,22 +498,15 @@ export function PedidosView() {
               </div>
             )}
 
-            {activeTab !== 'pendientes' && 'substitutionNote' in selected && selected.substitutionNote && (
-              <div className="rounded-xl border border-border bg-muted p-4">
-                <p className="mb-1 text-sm font-bold text-muted-foreground">Producto usado como sustituto:</p>
-                <p className="text-sm">{selected.substitutionNote}</p>
-              </div>
-            )}
-
             {activeTab === 'pendientes' && (
               <div className="mt-auto">
                 <button
                   type="button"
                   onClick={() => handleReady(selected)}
-                  disabled={!allPicked || !currentPhoto}
+                  disabled={!allPicked || currentPhotos.length === 0}
                   className={cn(
                     "flex h-16 w-full items-center justify-center gap-2 rounded-xl text-lg font-black transition-all",
-                    allPicked && currentPhoto
+                    allPicked && currentPhotos.length > 0
                       ? "bg-success text-success-foreground hover:brightness-95 shadow-lg shadow-success/20"
                       : "bg-muted text-muted-foreground opacity-50 cursor-not-allowed"
                   )}
@@ -488,7 +514,7 @@ export function PedidosView() {
                   <CheckCircle2 className="size-6" />
                   1. Marcar Pedido como Listo
                 </button>
-                {(!allPicked || !currentPhoto) && (
+                {(!allPicked || currentPhotos.length === 0) && (
                   <p className="mt-2 text-center text-xs font-semibold text-destructive">
                     {!allPicked ? "Falta marcar productos." : "Falta adjuntar evidencia fotográfica."}
                   </p>
@@ -561,7 +587,6 @@ function QrScannerModal({
   const [error, setError] = useState('')
 
   const handleManualValidation = () => {
-    // 3. LIMPIEZA EXTREMA: Solo números
     const manualCode = (inputRef.current?.value || '').replace(/[^0-9]/g, '')
     const cleanTarget = (securityCode || '').replace(/[^0-9]/g, '')
     
@@ -581,7 +606,6 @@ function QrScannerModal({
     if (data) {
       const cleanData = data.replace(/[^0-9]/g, '')
       const cleanTarget = (securityCode || '').replace(/[^0-9]/g, '')
-      
       if (cleanTarget !== '' && cleanData.includes(cleanTarget)) {
         onValidated()
       } else {
@@ -595,18 +619,19 @@ function QrScannerModal({
       <Modal open onClose={onClose} title="Validar Entrega" className="max-w-md bg-card">
         <div className="flex flex-col gap-6 p-6">
           
-          <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black border border-white/10 flex flex-col items-center justify-center">
+          {/* REPARACIÓN DEL ESCÁNER NEGRO: Se inyecta padding-top explícito en containerStyle */}
+          <div className="relative w-full overflow-hidden rounded-2xl border border-white/10 bg-black">
              <QrReader
                 onResult={(result: any) => {
                   if (!!result) {
                     handleScan(result?.getText())
                   }
                 }}
-                constraints={{ facingMode: 'user' }} // SOLUCIÓN CÁMARA MAC/CELULAR
-                containerStyle={{ width: '100%', height: '100%' }}
+                constraints={{ facingMode: 'environment' }}
+                containerStyle={{ width: '100%', paddingTop: '100%' }}
                 videoStyle={{ objectFit: 'cover' }}
              />
-             <div className="absolute inset-x-6 h-0.5 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
+             <div className="absolute inset-x-6 top-1/2 h-0.5 -translate-y-1/2 animate-scan bg-brand-yellow shadow-[0_0_16px_4px] shadow-brand-yellow/60" />
           </div>
 
           <div className="space-y-4 border-t border-border pt-6">
