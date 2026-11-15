@@ -87,13 +87,40 @@ export function AdminView() {
         <nav aria-label="Secciones Admin" className="flex flex-1 gap-2 p-3 md:flex-col md:p-4">
           <TabButton active={activeTab === 'kpis'} onClick={() => setActiveTab('kpis')} icon={BarChart3} label="Dashboard KPIs" />
           <TabButton 
-            active={activeTab === 'reclamos'} 
-            onClick={() => setActiveTab('reclamos')} 
-            icon={ShieldAlert} 
-            label="Reclamos y Extornos" 
-            badge={pendingComplaints} 
-          />
-          <TabButton 
+            {activeTab === 'reclamos' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
+                <div>
+                  <h2 className="text-xl font-black text-white flex items-center gap-2">
+                    <ShieldAlert className="size-6 text-brand-yellow" />
+                    Bandeja Oficial de Reclamos
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Los reclamos ingresados vía web se sincronizan directamente en la base de datos de Google Sheets.
+                  </p>
+                </div>
+                <a 
+                  href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=818640743&single=true" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20"
+                >
+                  Abrir Excel Completo <ExternalLink className="size-4" />
+                </a>
+              </div>
+
+              <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                <iframe 
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=818640743&single=true&widget=true&headers=false" 
+                  width="100%" 
+                  height="700" 
+                  frameBorder="0"
+                >
+                  Cargando base de datos...
+                </iframe>
+              </div>
+            </div>
+          )}
             active={activeTab === 'soporte'} 
             onClick={() => setActiveTab('soporte')} 
             icon={Headphones} 
