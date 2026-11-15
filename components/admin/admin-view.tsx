@@ -17,7 +17,9 @@ import {
   Search,
   AlertTriangle,
   Wallet,
-  Camera
+  Camera,
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/components/store-provider'
@@ -134,6 +136,42 @@ export function AdminView() {
                   <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-6 text-white transition-colors hover:bg-white/5">3. Entregados<br/><span className="mt-2 block text-4xl text-success">{deliveredOrders.length}</span></div>
                 </div>
               </div>
+
+              {/* Módulo de Calidad y Reclamos (Añadido) */}
+              <section className="mt-8 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-10 items-center justify-center rounded-full bg-red-500/10 text-red-500">
+                      <AlertCircle className="size-5" />
+                    </span>
+                    <div>
+                      <h2 className="text-xl font-black text-white">Control de Calidad y Soporte</h2>
+                      <p className="text-sm text-muted-foreground">Monitoreo mensual de quejas y reclamos en tiempo real.</p>
+                    </div>
+                  </div>
+                  <a 
+                    href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=818640743&single=true" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-flex items-center gap-2 text-sm font-bold text-primary hover:underline"
+                  >
+                    Abrir base maestra <ExternalLink className="size-4" />
+                  </a>
+                </div>
+
+                {/* Contenedor del Reporte Dinámico */}
+                <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                  <iframe 
+                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=818640743&single=true&widget=true&headers=false" 
+                    width="100%" 
+                    height="400" 
+                    frameBorder="0"
+                  >
+                    Cargando dashboard...
+                  </iframe>
+                </div>
+              </section>
+
             </div>
           )}
 
