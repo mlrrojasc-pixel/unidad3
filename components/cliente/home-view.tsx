@@ -112,23 +112,6 @@ export function HomeView() {
           </div>
         </div>
       </section>
-
-      {/* Sección de Atención al Cliente - Libro de Reclamaciones */}
-      <div style={{ marginTop: '20px', borderTop: '1px solid #e5e7eb', paddingTop: '40px', paddingBottom: '40px' }}>
-        <h2 className="text-2xl font-black text-center mb-6">
-          Atención al Cliente y Soporte
-        </h2>
-        <iframe 
-          src="https://docs.google.com/forms/d/e/1FAIpQLSfvna-5SzBK5PVUmqPcL5r0F6DyASLLI1mN9UHjWYrO7pvznw/viewform?embedded=true" 
-          width="100%" 
-          height="800" 
-          frameBorder="0" 
-          marginHeight="0" 
-          marginWidth="0"
-        >
-          Cargando Libro de Reclamaciones...
-        </iframe>
-      </div>
     </main>
   )
 }
