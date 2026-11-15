@@ -110,7 +110,7 @@ export function AdminView() {
           <div>
             <h1 className="text-xl font-black text-white">
               {activeTab === 'kpis' && 'Reporte Gerencial Consolidado'}
-              {activeTab === 'reclamos' && 'Bandeja de Reclamos y Reembolsos'}
+              {activeTab === 'reclamos' && 'Panel Analítico de Calidad'}
               {activeTab === 'soporte' && 'Tickets de Empleados'}
               {activeTab === 'clientes' && 'Directorio de Clientes'}
             </h1>
@@ -120,10 +120,13 @@ export function AdminView() {
         </header>
 
         <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8">
+          
+          {/* ======================================================== */}
+          {/* PESTAÑA 1: DASHBOARD GERENCIAL (OPERACIONES Y VENTAS)    */}
+          {/* ======================================================== */}
           {activeTab === 'kpis' && (
             <div className="space-y-6 animate-in fade-in">
               
-              {/* Módulo Analítica Prescriptiva (Alertas) */}
               {alerts.length > 0 && (
                 <div className="grid gap-3">
                   {alerts.map((alert, idx) => (
@@ -135,15 +138,35 @@ export function AdminView() {
                 </div>
               )}
 
-              {/* KPIs Operativos con Fuga de Capital */}
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 <MetricCard icon={TrendingUp} title="Ventas Netas" value={formatPrice(totalSales - capitalPerdido)} trend="Real" />
                 <MetricCard icon={RefreshCw} title="Sustituciones" value={`${substitutionRate}%`} trend={substitutionRate > 15 ? 'Riesgo' : 'Óptimo'} />
                 <MetricCard icon={AlertCircle} title="Fuga (Reembolsos)" value={formatPrice(capitalPerdido)} trend="Pérdida" />
                 <MetricCard icon={Wallet} title="Capital en Riesgo" value={formatPrice(capitalEnRiesgo)} trend="Por Stock" />
               </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Retorno de Inversión (SaaS)</h3>
+                    <p className="mt-2 text-3xl font-black text-white">S/ 149.00 <span className="text-base font-medium text-muted-foreground">/ mes</span></p>
+                    <p className="mt-2 text-xs font-semibold text-success">El sistema te ha alertado de una fuga potencial de {formatPrice(capitalEnRiesgo)} por quiebres de stock este mes.</p>
+                  </div>
+                  <div className="h-16 w-16 shrink-0 rounded-full bg-success/20 flex items-center justify-center">
+                    <Shield className="size-8 text-success" />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
+                  <h3 className="mb-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Flujo del embudo de hoy</h3>
+                  <div className="flex items-center gap-3 text-center text-sm font-black">
+                    <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-4 text-white transition-colors hover:bg-white/5">Pendientes<br/><span className="mt-1 block text-3xl text-primary">{orders.length}</span></div>
+                    <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-4 text-white transition-colors hover:bg-white/5">Listos<br/><span className="mt-1 block text-3xl text-brand-yellow">{completedOrders.length}</span></div>
+                    <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-4 text-white transition-colors hover:bg-white/5">Entregados<br/><span className="mt-1 block text-3xl text-success">{deliveredOrders.length}</span></div>
+                  </div>
+                </div>
+              </div>
               
-              {/* Nuevo Reporte Gerencial Integrado desde Sheets */}
               <section className="mt-8 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                   <div className="flex items-center gap-3">
@@ -151,20 +174,13 @@ export function AdminView() {
                       <PieChart className="size-5" />
                     </span>
                     <div>
-                      <h2 className="text-xl font-black text-white">Reporte Gerencial Omnicanal</h2>
-                      <p className="text-sm text-muted-foreground">Métricas comerciales, operativas y de calidad en tiempo real.</p>
+                      <h2 className="text-xl font-black text-white">Reporte Gerencial Operativo</h2>
+                      <p className="text-sm text-muted-foreground">Métricas comerciales y logísticas en tiempo real.</p>
                     </div>
                   </div>
-                  <a 
-                    href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=239313023&single=true" 
-                    target="_blank" 
-                    rel="noreferrer" 
-                    className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
-                  >
-                    Ver en Google Sheets <ExternalLink className="size-4" />
-                  </a>
                 </div>
 
+                {/* AQUÍ PEGAS EL LINK DEL PRIMER DASHBOARD (EL GERENCIAL) CUANDO LO TENGAS PUBLICADO */}
                 <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   <iframe 
                     src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=239313023&single=true" 
@@ -179,26 +195,52 @@ export function AdminView() {
             </div>
           )}
 
+          {/* ======================================================== */}
+          {/* PESTAÑA 2: DASHBOARD RECLAMOS (EL QUE ME ACABAS DE PASAR)*/}
+          {/* ======================================================== */}
           {activeTab === 'reclamos' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-16 text-muted-foreground bg-[#141419]">
-                <ShieldAlert className="size-16 text-brand-yellow/50 mb-4" />
-                <p className="text-lg font-bold text-white">Gestión en Base de Datos Central</p>
-                <p className="text-sm mt-2 max-w-md text-center">
-                  Los reclamos ingresados vía web están centralizados en la base maestra corporativa de Google Sheets. Las devoluciones se procesan directamente desde allí.
-                </p>
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-brand-yellow/10 text-brand-yellow">
+                    <ShieldAlert className="size-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-xl font-black text-white">CRM de Atención Postventa</h2>
+                    <p className="text-sm text-muted-foreground">
+                      Análisis de calidad de servicio y gestión de devoluciones centralizado.
+                    </p>
+                  </div>
+                </div>
                 <a 
-                  href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=818640743&single=true" 
+                  href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=593959324&single=true" 
                   target="_blank" 
                   rel="noreferrer" 
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity"
+                  className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
                 >
-                  Abrir Bandeja de Reclamos <ExternalLink className="size-4" />
+                  Abrir Data Cruda <ExternalLink className="size-4" />
                 </a>
               </div>
+
+              {/* AQUÍ ESTÁ TU NUEVO DASHBOARD DE RECLAMOS INCRUSTADO */}
+              <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-xl">
+                <iframe 
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=593959324&single=true&widget=true&headers=false" 
+                  width="100%" 
+                  height="750" 
+                  frameBorder="0"
+                >
+                  Cargando Dashboard de Reclamos...
+                </iframe>
+              </div>
+
             </div>
           )}
 
+          {/* ======================================================== */}
+          {/* PESTAÑA 3: SOPORTE INTERNO                               */}
+          {/* ======================================================== */}
           {activeTab === 'soporte' && (
             <div className="mx-auto max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-4">
               <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-gradient-to-r from-[#141419] to-[#0a0a0a] p-6 shadow-lg">
@@ -281,6 +323,9 @@ export function AdminView() {
             </div>
           )}
 
+          {/* ======================================================== */}
+          {/* PESTAÑA 4: CLIENTES                                      */}
+          {/* ======================================================== */}
           {activeTab === 'clientes' && (
             <div className="rounded-2xl border border-white/10 bg-[#141419] overflow-hidden shadow-xl animate-in fade-in">
               <div className="bg-black/40 p-4 border-b border-white/10 flex justify-between items-center">
