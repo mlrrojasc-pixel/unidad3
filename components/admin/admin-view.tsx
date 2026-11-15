@@ -15,7 +15,9 @@ import {
   Search,
   AlertTriangle,
   Wallet,
-  ExternalLink
+  ExternalLink,
+  PieChart,
+  AlertCircle
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/components/store-provider'
@@ -25,7 +27,7 @@ import { formatPrice } from '@/lib/store-data'
 type AdminTab = 'kpis' | 'reclamos' | 'soporte' | 'clientes'
 
 export function AdminView() {
-  const { orders, completedOrders, deliveredOrders, tickets, resolveTicket, sede } = useStore()
+  const { orders, completedOrders, deliveredOrders, complaints, tickets, resolveTicket, sede } = useStore()
   const [activeTab, setActiveTab] = useState<AdminTab>('kpis')
   
   const [ticketReplies, setTicketReplies] = useState<Record<string, string>>({})
@@ -38,6 +40,8 @@ export function AdminView() {
   const totalItemsSubstituted = allOrders.reduce((sum, o) => sum + o.items.filter(i => i.substitute).reduce((s, i) => s + i.qty, 0), 0);
   const substitutionRate = Math.round((totalItemsSubstituted / totalItemsSold) * 100);
 
+  const refundRate = Math.round((complaints.filter(c => c.type === 'Reembolso').length / totalOrders) * 100)
+  
   const avgItemsPerOrder = deliveredOrders.length > 0 
     ? deliveredOrders.reduce((sum, o) => sum + o.items.reduce((s, i) => s + i.qty, 0), 0) / deliveredOrders.length 
     : 0
@@ -45,12 +49,36 @@ export function AdminView() {
   const packTimeMins = deliveredOrders.length > 0 ? Math.max(2, Math.round(avgItemsPerOrder * 1.5)) : 0
   const deliveryTimeMins = deliveredOrders.length > 0 ? Math.max(1, Math.round(avgItemsPerOrder * 0.8)) : 0
   
-  const avgPackStr = deliveredOrders.length > 0 ? `0${packTimeMins}:45 min` : "00:00 min"
-  const avgDelivStr = deliveredOrders.length > 0 ? `0${deliveryTimeMins}:20 min` : "00:00 min"
-
   const uniqueCustomers = Array.from(new Set(allOrders.map(o => o.customer)))
-  
   const pendingTickets = tickets.filter(t => t.status !== 'Resuelto').length
+
+  // ==========================================
+  // LÓGICA DE NEGOCIO B2B: FUGA DE CAPITAL Y ROI
+  // ==========================================
+  const approvedRefunds = complaints.filter(c => c.resolutionStatus === 'Aprobado');
+  const capitalPerdido = approvedRefunds.reduce((total, c) => {
+    const relatedOrder = allOrders.find(o => o.id === c.orderId);
+    if (!relatedOrder) return total;
+    return total + relatedOrder.items.reduce((sum: number, item: any) => sum + (item.price * item.qty), 0);
+  }, 0);
+
+  const capitalEnRiesgo = allOrders
+    .filter(o => o.items.some((i: any) => i.substitute))
+    .reduce((total, o) => total + o.items.reduce((sum: number, item: any) => sum + (item.price * item.qty), 0), 0);
+
+  // ==========================================
+  // ANALÍTICA PRESCRIPTIVA (ALERTAS AUTOMÁTICAS)
+  // ==========================================
+  const alerts = [];
+  if (substitutionRate > 15) {
+    alerts.push({ type: 'warning', text: 'Alerta: Alta discrepancia de inventario físico vs web. Se sugiere auditoría en góndolas.' });
+  }
+  if (refundRate > 5) {
+    alerts.push({ type: 'destructive', text: 'Alerta: Picos de reembolsos solicitados. Posibles fallas en el empaquetado.' });
+  }
+  if (packTimeMins > 5) {
+    alerts.push({ type: 'warning', text: 'Alerta: Tiempo de preparación elevado. Posible cuello de botella operativo.' });
+  }
 
   const handleResolveTicket = (id: string, status: 'En revisión' | 'Resuelto') => {
     const text = ticketReplies[id]
@@ -70,20 +98,9 @@ export function AdminView() {
           </span>
         </div>
         <nav aria-label="Secciones Admin" className="flex flex-1 gap-2 p-3 md:flex-col md:p-4">
-          <TabButton active={activeTab === 'kpis'} onClick={() => setActiveTab('kpis')} icon={BarChart3} label="Dashboard KPIs" />
-          <TabButton 
-            active={activeTab === 'reclamos'} 
-            onClick={() => setActiveTab('reclamos')} 
-            icon={ShieldAlert} 
-            label="Reclamos y Extornos" 
-          />
-          <TabButton 
-            active={activeTab === 'soporte'} 
-            onClick={() => setActiveTab('soporte')} 
-            icon={Headphones} 
-            label="Soporte Interno" 
-            badge={pendingTickets}
-          />
+          <TabButton active={activeTab === 'kpis'} onClick={() => setActiveTab('kpis')} icon={BarChart3} label="Dashboard General" />
+          <TabButton active={activeTab === 'reclamos'} onClick={() => setActiveTab('reclamos')} icon={ShieldAlert} label="Reclamos y Extornos" />
+          <TabButton active={activeTab === 'soporte'} onClick={() => setActiveTab('soporte')} icon={Headphones} label="Soporte Interno" badge={pendingTickets} />
           <TabButton active={activeTab === 'clientes'} onClick={() => setActiveTab('clientes')} icon={Users} label="Base de Clientes" />
         </nav>
       </aside>
@@ -92,8 +109,8 @@ export function AdminView() {
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/5 bg-[#0a0a0a] px-4 py-3 md:px-8">
           <div>
             <h1 className="text-xl font-black text-white">
-              {activeTab === 'kpis' && 'Métricas de Rendimiento'}
-              {activeTab === 'reclamos' && 'Gestión de Reembolsos'}
+              {activeTab === 'kpis' && 'Reporte Gerencial Consolidado'}
+              {activeTab === 'reclamos' && 'Bandeja de Reclamos y Reembolsos'}
               {activeTab === 'soporte' && 'Tickets de Empleados'}
               {activeTab === 'clientes' && 'Directorio de Clientes'}
             </h1>
@@ -105,57 +122,79 @@ export function AdminView() {
         <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8">
           {activeTab === 'kpis' && (
             <div className="space-y-6 animate-in fade-in">
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                <MetricCard icon={TrendingUp} title="Ingresos" value={formatPrice(totalSales)} trend="+12.5%" />
-                <MetricCard icon={Clock} title="Empaquetado" value={avgPackStr} />
-                <MetricCard icon={PackageCheck} title="T. Entrega" value={avgDelivStr} />
-                <MetricCard icon={RefreshCw} title="Sustituciones" value={`${substitutionRate}%`} trend={substitutionRate > 20 ? 'Alto' : 'Óptimo'} />
-                <MetricCard icon={Wallet} title="Reembolsos" value="1.5%" trend="Óptimo" />
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
-                <h3 className="mb-4 text-sm font-bold text-muted-foreground">Flujo del embudo de hoy</h3>
-                <div className="flex items-center gap-4 text-center text-sm font-black">
-                  <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-6 text-white transition-colors hover:bg-white/5">1. Pendientes<br/><span className="mt-2 block text-4xl text-primary">{orders.length}</span></div>
-                  <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-6 text-white transition-colors hover:bg-white/5">2. Listos<br/><span className="mt-2 block text-4xl text-brand-yellow">{completedOrders.length}</span></div>
-                  <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-6 text-white transition-colors hover:bg-white/5">3. Entregados<br/><span className="mt-2 block text-4xl text-success">{deliveredOrders.length}</span></div>
+              
+              {/* Módulo Analítica Prescriptiva (Alertas) */}
+              {alerts.length > 0 && (
+                <div className="grid gap-3">
+                  {alerts.map((alert, idx) => (
+                    <div key={idx} className={cn("flex items-center gap-3 p-4 rounded-xl border font-bold text-sm shadow-sm", alert.type === 'warning' ? 'bg-brand-yellow/10 border-brand-yellow/20 text-brand-yellow' : 'bg-destructive/10 border-destructive/20 text-destructive-foreground')}>
+                      <AlertTriangle className="size-5" />
+                      {alert.text}
+                    </div>
+                  ))}
                 </div>
+              )}
+
+              {/* KPIs Operativos con Fuga de Capital */}
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <MetricCard icon={TrendingUp} title="Ventas Netas" value={formatPrice(totalSales - capitalPerdido)} trend="Real" />
+                <MetricCard icon={RefreshCw} title="Sustituciones" value={`${substitutionRate}%`} trend={substitutionRate > 15 ? 'Riesgo' : 'Óptimo'} />
+                <MetricCard icon={AlertCircle} title="Fuga (Reembolsos)" value={formatPrice(capitalPerdido)} trend="Pérdida" />
+                <MetricCard icon={Wallet} title="Capital en Riesgo" value={formatPrice(capitalEnRiesgo)} trend="Por Stock" />
               </div>
+              
+              {/* Nuevo Reporte Gerencial Integrado desde Sheets */}
+              <section className="mt-8 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                      <PieChart className="size-5" />
+                    </span>
+                    <div>
+                      <h2 className="text-xl font-black text-white">Reporte Gerencial Omnicanal</h2>
+                      <p className="text-sm text-muted-foreground">Métricas comerciales, operativas y de calidad en tiempo real.</p>
+                    </div>
+                  </div>
+                  <a 
+                    href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=239313023&single=true" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                  >
+                    Ver en Google Sheets <ExternalLink className="size-4" />
+                  </a>
+                </div>
+
+                <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
+                  <iframe 
+                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=239313023&single=true" 
+                    width="100%" 
+                    height="600" 
+                    frameBorder="0"
+                  >
+                    Cargando dashboard gerencial...
+                  </iframe>
+                </div>
+              </section>
             </div>
           )}
 
           {activeTab === 'reclamos' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
-                <div className="flex items-center gap-3">
-                  <span className="flex size-10 items-center justify-center rounded-full bg-brand-yellow/10 text-brand-yellow">
-                    <ShieldAlert className="size-5" />
-                  </span>
-                  <div>
-                    <h2 className="text-xl font-black text-white">Bandeja Oficial de Reclamos</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Los reclamos ingresados vía web se sincronizan directamente en la base de datos de Google Sheets.
-                    </p>
-                  </div>
-                </div>
+              <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-16 text-muted-foreground bg-[#141419]">
+                <ShieldAlert className="size-16 text-brand-yellow/50 mb-4" />
+                <p className="text-lg font-bold text-white">Gestión en Base de Datos Central</p>
+                <p className="text-sm mt-2 max-w-md text-center">
+                  Los reclamos ingresados vía web están centralizados en la base maestra corporativa de Google Sheets. Las devoluciones se procesan directamente desde allí.
+                </p>
                 <a 
                   href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=818640743&single=true" 
                   target="_blank" 
                   rel="noreferrer" 
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl bg-primary px-6 py-3 text-sm font-bold text-primary-foreground hover:opacity-90 transition-opacity"
                 >
-                  Abrir Excel Completo <ExternalLink className="size-4" />
+                  Abrir Bandeja de Reclamos <ExternalLink className="size-4" />
                 </a>
-              </div>
-
-              <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                <iframe 
-                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=818640743&single=true&widget=true&headers=false" 
-                  width="100%" 
-                  height="700" 
-                  frameBorder="0"
-                >
-                  Cargando base de datos...
-                </iframe>
               </div>
             </div>
           )}
@@ -312,7 +351,16 @@ function MetricCard({ icon: Icon, title, value, trend }: any) {
       </div>
       <div className="mt-5 flex items-end justify-between">
         <p className="text-2xl font-black text-white">{value}</p>
-        {trend && <span className={cn("text-[10px] font-black uppercase px-2 py-1 rounded-md", trend.includes('+') || trend === 'Óptimo' || trend === 'Normal' ? 'bg-success/20 text-success' : 'bg-brand-yellow/20 text-brand-yellow')}>{trend}</span>}
+        {trend && (
+          <span className={cn(
+            "text-[10px] font-black uppercase px-2 py-1 rounded-md", 
+            trend === 'Óptimo' || trend === 'Real' ? 'bg-success/20 text-success' : 
+            trend === 'Pérdida' || trend === 'Riesgo' ? 'bg-destructive/20 text-destructive-foreground' : 
+            'bg-brand-yellow/20 text-brand-yellow'
+          )}>
+            {trend}
+          </span>
+        )}
       </div>
     </div>
   )
