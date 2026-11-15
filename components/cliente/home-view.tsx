@@ -72,6 +72,63 @@ export function HomeView() {
 
       <CategoryFilters />
       <ProductGrid />
+
+      {/* Sección de Políticas y Reglamento */}
+      <section className="mt-12 mb-8 rounded-2xl border border-border bg-muted p-6 md:p-10">
+        <h2 className="text-2xl font-black mb-6 text-primary">Reglamento y Políticas de Tienda</h2>
+        
+        <div className="grid gap-8 md:grid-cols-2 text-sm text-muted-foreground">
+          <div>
+            <h3 className="text-base font-bold mb-2 text-foreground">1. Política de Click & Collect</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>El cliente tiene un plazo máximo de <strong>48 horas</strong> para recoger su pedido tras recibir la confirmación de "Listo para recoger".</li>
+              <li>Es estrictamente obligatorio dictar el <strong>PIN de seguridad</strong> o mostrar el código QR al operario para la entrega.</li>
+              <li>Vencido el plazo, el pedido se anula automáticamente y los productos retornan al inventario general.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-base font-bold mb-2 text-foreground">2. Cambios y Devoluciones</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Se aceptan solicitudes dentro de los <strong>7 días calendario</strong> posteriores a la compra.</li>
+              <li>Es indispensable presentar el comprobante de pago digital o físico y el DNI del titular.</li>
+              <li>El producto debe estar sellado, en su empaque original y sin señales de uso.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-base font-bold mb-2 text-foreground">3. Excepciones</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Por normativas de salubridad, <strong>no aplican cambios ni devoluciones en productos perecibles</strong> (carnes, lácteos, verduras, congelados) ni artículos de higiene personal.</li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-base font-bold mb-2 text-foreground">4. Reembolsos</h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>Todo reembolso aprobado será procesado directamente al medio de pago original (Yape, Plin o Tarjeta).</li>
+              <li>El tiempo de visibilidad en la cuenta dependerá de la entidad bancaria (máximo 5 días hábiles).</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Sección de Atención al Cliente - Libro de Reclamaciones */}
+      <div style={{ marginTop: '20px', borderTop: '1px solid #e5e7eb', paddingTop: '40px', paddingBottom: '40px' }}>
+        <h2 className="text-2xl font-black text-center mb-6">
+          Atención al Cliente y Soporte
+        </h2>
+        <iframe 
+          src="https://docs.google.com/forms/d/e/1FAIpQLSfvna-5SzBK5PVUmqPcL5r0F6DyASLLI1mN9UHjWYrO7pvznw/viewform?embedded=true" 
+          width="100%" 
+          height="800" 
+          frameBorder="0" 
+          marginHeight="0" 
+          marginWidth="0"
+        >
+          Cargando Libro de Reclamaciones...
+        </iframe>
+      </div>
     </main>
   )
 }
