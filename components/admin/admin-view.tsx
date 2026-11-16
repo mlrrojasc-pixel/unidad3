@@ -24,7 +24,6 @@ import { useStore } from '@/components/store-provider'
 import { ModeToggle } from '@/components/shared'
 import { formatPrice } from '@/lib/store-data'
 
-// NUEVO: Agregamos 'control' a los tipos de pestañas
 type AdminTab = 'kpis' | 'control' | 'reclamos' | 'soporte' | 'clientes'
 
 export function AdminView() {
@@ -100,7 +99,6 @@ export function AdminView() {
         </div>
         <nav aria-label="Secciones Admin" className="flex flex-1 gap-2 p-3 md:flex-col md:p-4">
           <TabButton active={activeTab === 'kpis'} onClick={() => setActiveTab('kpis')} icon={BarChart3} label="Dashboard General" />
-          {/* NUEVA PESTAÑA */}
           <TabButton active={activeTab === 'control'} onClick={() => setActiveTab('control')} icon={Clock} label="Control Empleado" />
           <TabButton active={activeTab === 'reclamos'} onClick={() => setActiveTab('reclamos')} icon={ShieldAlert} label="Reclamos y Extornos" />
           <TabButton active={activeTab === 'soporte'} onClick={() => setActiveTab('soporte')} icon={Headphones} label="Soporte Interno" badge={pendingTickets} />
@@ -193,10 +191,9 @@ export function AdminView() {
                 </div>
                 <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   <iframe 
-                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=239313023&single=true&widget=true&headers=false" 
-                    width="100%" 
-                    height="650" 
-                    frameBorder="0"
+                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/htmlembed?gid=239313023&single=true&widget=true&headers=false" 
+                    className="w-full min-h-[650px] border-0"
+                    title="Dashboard Gerencial"
                   ></iframe>
                 </div>
               </section>
@@ -204,7 +201,7 @@ export function AdminView() {
           )}
 
           {/* ======================================================== */}
-          {/* PESTAÑA 2: CONTROL EMPLEADO Y TIEMPOS (NUEVA PESTAÑA)    */}
+          {/* PESTAÑA 2: CONTROL EMPLEADO Y TIEMPOS                    */}
           {/* ======================================================== */}
           {activeTab === 'control' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -231,10 +228,9 @@ export function AdminView() {
 
               <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-xl">
                 <iframe 
-                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=914724&single=true&widget=true&headers=false" 
-                  width="100%" 
-                  height="700" 
-                  frameBorder="0"
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/htmlembed?gid=914724&single=true&widget=true&headers=false" 
+                  className="w-full min-h-[700px] border-0"
+                  title="Control de Tiempos"
                 ></iframe>
               </div>
 
@@ -271,10 +267,9 @@ export function AdminView() {
 
               <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-xl">
                 <iframe 
-                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=593959324&single=true&widget=true&headers=false" 
-                  width="100%" 
-                  height="750" 
-                  frameBorder="0"
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/htmlembed?gid=593959324&single=true&widget=true&headers=false" 
+                  className="w-full min-h-[750px] border-0"
+                  title="Dashboard de Reclamos"
                 ></iframe>
               </div>
 
