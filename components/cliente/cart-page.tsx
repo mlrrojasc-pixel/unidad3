@@ -25,8 +25,6 @@ import { useStore } from '@/components/store-provider'
 import { PaymentSection, type ConfirmedOrder } from '@/components/cliente/payment-section'
 import { Modal } from '@/components/shared'
 
-const NUMERO_WHATSAPP = '33756953664'
-
 export function CartPage() {
   const { cart, cartCount, cartTotal, updateQty, clearCart, sede, unavailableCount } = useStore()
   const [confirmed, setConfirmed] = useState<ConfirmedOrder | null>(null)
@@ -36,8 +34,8 @@ export function CartPage() {
   }
           
   if (confirmed) {
-    const mensajeCorto = `Start`
-    const enlaceWhatsApp = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensajeCorto)}`
+    // Apuntamos al número oficial de Typebot y enviamos un "Hola" para disparar el menú inicial
+    const enlaceWhatsApp = `https://wa.me/33756953664?text=Hola`
 
     return (
       <main className="mx-auto flex max-w-2xl flex-col items-center px-4 py-12 text-center">
