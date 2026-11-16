@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ClipboardList, Headphones, Package, PackageCheck, ShieldAlert } from 'lucide-react'
+import { ClipboardList, Headphones, Package, PackageCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/components/store-provider'
 import { ModeToggle } from '@/components/shared'
@@ -11,13 +11,12 @@ import { ModeToggle } from '@/components/shared'
 const TABS = [
   { href: '/empleado', label: 'Pedidos', icon: ClipboardList },
   { href: '/empleado/inventario', label: 'Inventario', icon: Package },
-  { href: '/empleado/reclamos', label: 'Reclamos', icon: ShieldAlert },
   { href: '/empleado/soporte', label: 'Soporte', icon: Headphones },
 ]
 
 export function EmpleadoShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const { orders, readyCount, complaints, sede, startShift } = useStore()
+  const { orders, readyCount, sede, startShift } = useStore()
   const current = TABS.find((t) => t.href === pathname) ?? TABS[0]
 
   useEffect(() => {
@@ -63,18 +62,6 @@ export function EmpleadoShell({ children }: { children: React.ReactNode }) {
                     )}
                   >
                     {orders.length}
-                  </span>
-                )}
-                
-                {/* Globo contador de Reclamos */}
-                {label === 'Reclamos' && complaints.length > 0 && (
-                  <span
-                    className={cn(
-                      'ml-auto rounded-full px-2 py-0.5 text-xs font-bold',
-                      active ? 'bg-black/15' : 'bg-brand-yellow text-brand-yellow-foreground',
-                    )}
-                  >
-                    {complaints.length}
                   </span>
                 )}
               </Link>
