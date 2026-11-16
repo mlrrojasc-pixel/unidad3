@@ -241,7 +241,6 @@ export function CartPage() {
 function CustomerOrdersAndComplaints() {
   const { user, orders, completedOrders, deliveredOrders, showToast } = useStore()
 
-  // ESTADOS PARA REPROGRAMACIÓN DE HORARIO
   const [isRescheduleModalOpen, setIsRescheduleModalOpen] = useState(false)
   const [orderToReschedule, setOrderToReschedule] = useState<any>(null)
   const [newTime, setNewTime] = useState('')
@@ -362,7 +361,6 @@ function CustomerOrdersAndComplaints() {
         )}
       </section>
 
-      {/* AQUÍ INICIA LA SECCIÓN DEL LIBRO DE RECLAMACIONES (GOOGLE FORMS) */}
       <section className="rounded-2xl border border-border bg-card p-6">
         <div className="flex items-center gap-2.5">
           <BookOpen className="size-6 text-primary" />
@@ -386,7 +384,6 @@ function CustomerOrdersAndComplaints() {
         </div>
       </section>
 
-      {/* MODAL DE REPROGRAMACIÓN */}
       {isRescheduleModalOpen && orderToReschedule && (
         <Modal 
           open={isRescheduleModalOpen} 
