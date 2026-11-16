@@ -34,7 +34,6 @@ export function CartPage() {
   }
           
   if (confirmed) {
-    // Apuntamos al número oficial de Typebot y enviamos un "Hola" para disparar el menú inicial
     const enlaceTypebot = `https://typebot.co/la-cosmina-bot-8f1rul7`
 
     return (
@@ -265,7 +264,7 @@ function CustomerOrdersAndComplaints() {
     if (!orderToReschedule || !newTime) return;
 
     try {
-      await fetch(`https://sheetdb.io/api/v1/ns4qr1usr5h31/ID%20de%20Pedido/${orderToReschedule.id}`, {
+      await fetch(`https://sheetdb.io/api/v1/zs4qzkir5i1x0/ID%20de%20Pedido/${orderToReschedule.id}`, {
         method: 'PATCH',
         headers: {
           'Accept': 'application/json',
