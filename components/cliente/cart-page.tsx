@@ -35,7 +35,7 @@ export function CartPage() {
           
   if (confirmed) {
     // Apuntamos al número oficial de Typebot y enviamos un "Hola" para disparar el menú inicial
-    const enlaceWhatsApp = `https://wa.me/33756953664?text=Hola`
+    const enlaceTypebot = `https://typebot.co/la-cosmina-bot-8f1rul7`
 
     return (
       <main className="mx-auto flex max-w-2xl flex-col items-center px-4 py-12 text-center">
@@ -66,15 +66,15 @@ export function CartPage() {
 
         <div className="mt-8 flex w-full flex-col gap-3">
           <p className="text-sm font-bold text-muted-foreground">
-            Envía únicamente tu ID por WhatsApp para recibir tu código QR de recojo:
+            Envía únicamente tu ID de tu pedido por Typebot para recibir tu código QR de recojo:
           </p>
           <a
-            href={enlaceWhatsApp}
+            href={enlaceTypebot}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-[#25D366] px-8 text-lg font-black text-white shadow-lg transition-transform hover:scale-[1.01]"
+            className="inline-flex h-14 w-full items-center justify-center rounded-xl bg-[#FF6B00] px-8 text-lg font-black text-white shadow-lg transition-transform hover:scale-[1.01]"
           >
-            Enviar mi ID ({confirmed.orderId}) por WhatsApp
+            Enviar mi ID ({confirmed.orderId}) por Typebot
           </a>
           <Link
             href="/"
