@@ -171,24 +171,31 @@ export function AdminView() {
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                   <div className="flex items-center gap-3">
                     <span className="flex size-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                      <PieChart className="size-5" />
+                      <Clock className="size-5" />
                     </span>
                     <div>
-                      <h2 className="text-xl font-black text-white">Reporte Gerencial Operativo</h2>
-                      <p className="text-sm text-muted-foreground">Métricas comerciales y logísticas en tiempo real.</p>
+                      <h2 className="text-xl font-black text-white">Reporte Gerencial Operativo - Control de Tiempos</h2>
+                      <p className="text-sm text-muted-foreground">Métricas logísticas de picking y entrega en tienda en tiempo real.</p>
                     </div>
                   </div>
+                  <a 
+                    href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=914724&single=true" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                  >
+                    Abrir Data Cruda <ExternalLink className="size-4" />
+                  </a>
                 </div>
 
-                {/* AQUÍ PEGAS EL LINK DEL PRIMER DASHBOARD (EL GERENCIAL) CUANDO LO TENGAS PUBLICADO */}
                 <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   <iframe 
-                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=239313023&single=true" 
+                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=914724&single=true&widget=true&headers=false" 
                     width="100%" 
                     height="600" 
                     frameBorder="0"
                   >
-                    Cargando dashboard gerencial...
+                    Cargando dashboard de control de tiempos...
                   </iframe>
                 </div>
               </section>
@@ -196,7 +203,7 @@ export function AdminView() {
           )}
 
           {/* ======================================================== */}
-          {/* PESTAÑA 2: DASHBOARD RECLAMOS (EL QUE ME ACABAS DE PASAR)*/}
+          {/* PESTAÑA 2: DASHBOARD RECLAMOS                            */}
           {/* ======================================================== */}
           {activeTab === 'reclamos' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -223,7 +230,6 @@ export function AdminView() {
                 </a>
               </div>
 
-              {/* AQUÍ ESTÁ TU NUEVO DASHBOARD DE RECLAMOS INCRUSTADO */}
               <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-xl">
                 <iframe 
                   src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=593959324&single=true&widget=true&headers=false" 
