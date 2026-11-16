@@ -191,7 +191,7 @@ export function AdminView() {
                 </div>
                 <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   <iframe 
-                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/htmlembed?gid=239313023&single=true&widget=true&headers=false" 
+                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=239313023&single=true&widget=true&headers=false" 
                     className="w-full min-h-[650px] border-0"
                     title="Dashboard Gerencial"
                   ></iframe>
@@ -228,7 +228,7 @@ export function AdminView() {
 
               <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-xl">
                 <iframe 
-                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/htmlembed?gid=914724&single=true&widget=true&headers=false" 
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=914724&single=true&widget=true&headers=false" 
                   className="w-full min-h-[700px] border-0"
                   title="Control de Tiempos"
                 ></iframe>
@@ -267,7 +267,7 @@ export function AdminView() {
 
               <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-xl">
                 <iframe 
-                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/htmlembed?gid=593959324&single=true&widget=true&headers=false" 
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=593959324&single=true&widget=true&headers=false" 
                   className="w-full min-h-[750px] border-0"
                   title="Dashboard de Reclamos"
                 ></iframe>
