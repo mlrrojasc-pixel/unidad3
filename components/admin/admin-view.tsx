@@ -24,7 +24,8 @@ import { useStore } from '@/components/store-provider'
 import { ModeToggle } from '@/components/shared'
 import { formatPrice } from '@/lib/store-data'
 
-type AdminTab = 'kpis' | 'reclamos' | 'soporte' | 'clientes'
+// NUEVO: Agregamos 'control' a los tipos de pestañas
+type AdminTab = 'kpis' | 'control' | 'reclamos' | 'soporte' | 'clientes'
 
 export function AdminView() {
   const { orders, completedOrders, deliveredOrders, complaints, tickets, resolveTicket, sede } = useStore()
@@ -99,6 +100,8 @@ export function AdminView() {
         </div>
         <nav aria-label="Secciones Admin" className="flex flex-1 gap-2 p-3 md:flex-col md:p-4">
           <TabButton active={activeTab === 'kpis'} onClick={() => setActiveTab('kpis')} icon={BarChart3} label="Dashboard General" />
+          {/* NUEVA PESTAÑA */}
+          <TabButton active={activeTab === 'control'} onClick={() => setActiveTab('control')} icon={Clock} label="Control Empleado" />
           <TabButton active={activeTab === 'reclamos'} onClick={() => setActiveTab('reclamos')} icon={ShieldAlert} label="Reclamos y Extornos" />
           <TabButton active={activeTab === 'soporte'} onClick={() => setActiveTab('soporte')} icon={Headphones} label="Soporte Interno" badge={pendingTickets} />
           <TabButton active={activeTab === 'clientes'} onClick={() => setActiveTab('clientes')} icon={Users} label="Base de Clientes" />
@@ -110,6 +113,7 @@ export function AdminView() {
           <div>
             <h1 className="text-xl font-black text-white">
               {activeTab === 'kpis' && 'Reporte Gerencial Consolidado'}
+              {activeTab === 'control' && 'Métricas de Productividad Operativa'}
               {activeTab === 'reclamos' && 'Panel Analítico de Calidad'}
               {activeTab === 'soporte' && 'Tickets de Empleados'}
               {activeTab === 'clientes' && 'Directorio de Clientes'}
@@ -122,7 +126,7 @@ export function AdminView() {
         <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8">
           
           {/* ======================================================== */}
-          {/* PESTAÑA 1: DASHBOARD GERENCIAL (LOS 3 REPORTES JUNTOS)   */}
+          {/* PESTAÑA 1: DASHBOARD GERENCIAL (VISIÓN 360)              */}
           {/* ======================================================== */}
           {activeTab === 'kpis' && (
             <div className="space-y-6 animate-in fade-in">
@@ -145,7 +149,28 @@ export function AdminView() {
                 <MetricCard icon={Wallet} title="Capital en Riesgo" value={formatPrice(capitalEnRiesgo)} trend="Por Stock" />
               </div>
 
-              {/* DASHBOARD 1: GERENCIAL */}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Retorno de Inversión (SaaS)</h3>
+                    <p className="mt-2 text-3xl font-black text-white">S/ 149.00 <span className="text-base font-medium text-muted-foreground">/ mes</span></p>
+                    <p className="mt-2 text-xs font-semibold text-success">El sistema te ha alertado de una fuga potencial de {formatPrice(capitalEnRiesgo)} por quiebres de stock este mes.</p>
+                  </div>
+                  <div className="h-16 w-16 shrink-0 rounded-full bg-success/20 flex items-center justify-center">
+                    <Shield className="size-8 text-success" />
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
+                  <h3 className="mb-4 text-xs font-bold text-muted-foreground uppercase tracking-wider">Flujo del embudo de hoy</h3>
+                  <div className="flex items-center gap-3 text-center text-sm font-black">
+                    <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-4 text-white transition-colors hover:bg-white/5">Pendientes<br/><span className="mt-1 block text-3xl text-primary">{orders.length}</span></div>
+                    <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-4 text-white transition-colors hover:bg-white/5">Listos<br/><span className="mt-1 block text-3xl text-brand-yellow">{completedOrders.length}</span></div>
+                    <div className="flex-1 rounded-xl border border-white/5 bg-black/40 py-4 text-white transition-colors hover:bg-white/5">Entregados<br/><span className="mt-1 block text-3xl text-success">{deliveredOrders.length}</span></div>
+                  </div>
+                </div>
+              </div>
+              
               <section className="mt-8 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
                   <div className="flex items-center gap-3">
@@ -157,6 +182,14 @@ export function AdminView() {
                       <p className="text-sm text-muted-foreground">Monitoreo general de ventas y operaciones comerciales.</p>
                     </div>
                   </div>
+                  <a 
+                    href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=239313023&single=true" 
+                    target="_blank" 
+                    rel="noreferrer" 
+                    className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                  >
+                    Pantalla Completa <ExternalLink className="size-4" />
+                  </a>
                 </div>
                 <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
                   <iframe 
@@ -167,70 +200,62 @@ export function AdminView() {
                   ></iframe>
                 </div>
               </section>
+            </div>
+          )}
 
-              {/* DASHBOARD 2: TIEMPOS */}
-              <section className="mt-8 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-10 items-center justify-center rounded-full bg-brand-yellow/10 text-brand-yellow">
-                      <Clock className="size-5" />
-                    </span>
-                    <div>
-                      <h2 className="text-xl font-black text-white">Control de Tiempos y SLA</h2>
-                      <p className="text-sm text-muted-foreground">Métricas logísticas de picking y cumplimiento en tienda en tiempo real.</p>
-                    </div>
+          {/* ======================================================== */}
+          {/* PESTAÑA 2: CONTROL EMPLEADO Y TIEMPOS (NUEVA PESTAÑA)    */}
+          {/* ======================================================== */}
+          {activeTab === 'control' && (
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
+                <div className="flex items-center gap-3">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-brand-yellow/10 text-brand-yellow">
+                    <Clock className="size-5" />
+                  </span>
+                  <div>
+                    <h2 className="text-xl font-black text-white">Control de Tiempos y SLA</h2>
+                    <p className="text-sm text-muted-foreground">Métricas logísticas de picking y cumplimiento del equipo de tienda.</p>
                   </div>
                 </div>
-                <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                  <iframe 
-                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=914724&single=true&widget=true&headers=false" 
-                    width="100%" 
-                    height="500" 
-                    frameBorder="0"
-                  ></iframe>
-                </div>
-              </section>
+                <a 
+                  href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=914724&single=true" 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-yellow/10 px-4 py-2 text-sm font-bold text-brand-yellow hover:bg-brand-yellow/20 transition-colors whitespace-nowrap"
+                >
+                  Pantalla Completa <ExternalLink className="size-4" />
+                </a>
+              </div>
 
-              {/* DASHBOARD 3: RECLAMOS */}
-              <section className="mt-8 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
-                      <ShieldAlert className="size-5" />
-                    </span>
-                    <div>
-                      <h2 className="text-xl font-black text-white">Dashboard Analítico de Reclamos</h2>
-                      <p className="text-sm text-muted-foreground">Análisis de calidad de servicio, incidencias y reembolsos aprobados.</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40">
-                  <iframe 
-                    src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=593959324&single=true&widget=true&headers=false" 
-                    width="100%" 
-                    height="750" 
-                    frameBorder="0"
-                  ></iframe>
-                </div>
-              </section>
+              <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-xl">
+                <iframe 
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=914724&single=true&widget=true&headers=false" 
+                  width="100%" 
+                  height="700" 
+                  frameBorder="0"
+                ></iframe>
+              </div>
 
             </div>
           )}
 
           {/* ======================================================== */}
-          {/* PESTAÑA 2: RECLAMOS INDIVIDUAL (DATA CRUDA OPCIONAL)     */}
+          {/* PESTAÑA 3: RECLAMOS Y EXTORNOS                           */}
           {/* ======================================================== */}
           {activeTab === 'reclamos' && (
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4">
+              
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border border-white/10 bg-[#141419] p-6 shadow-xl">
                 <div className="flex items-center gap-3">
-                  <span className="flex size-10 items-center justify-center rounded-full bg-brand-yellow/10 text-brand-yellow">
+                  <span className="flex size-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
                     <ShieldAlert className="size-5" />
                   </span>
                   <div>
                     <h2 className="text-xl font-black text-white">CRM de Atención Postventa</h2>
                     <p className="text-sm text-muted-foreground">
-                      Tu dashboard de reclamos ahora está en la pestaña "Dashboard General". Aquí puedes abrir la base de datos cruda.
+                      Análisis de calidad de servicio, incidencias y gestión de devoluciones.
                     </p>
                   </div>
                 </div>
@@ -238,16 +263,26 @@ export function AdminView() {
                   href="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=593959324&single=true" 
                   target="_blank" 
                   rel="noreferrer" 
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-2 text-sm font-bold text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                  className="inline-flex items-center gap-2 rounded-lg bg-destructive/10 px-4 py-2 text-sm font-bold text-destructive-foreground hover:bg-destructive/20 transition-colors whitespace-nowrap"
                 >
-                  Abrir Base de Reclamos <ExternalLink className="size-4" />
+                  Abrir Data Cruda <ExternalLink className="size-4" />
                 </a>
               </div>
+
+              <div className="w-full overflow-hidden rounded-xl border border-white/10 bg-black/40 shadow-xl">
+                <iframe 
+                  src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSSYutG8VGZ6vHtTU1H3KEF7sVBPxwdmVW8cImrqviRoxEHUCXcifCUsHm4AKZ30N4B_U51MPwBsit2/pubhtml?gid=593959324&single=true&widget=true&headers=false" 
+                  width="100%" 
+                  height="750" 
+                  frameBorder="0"
+                ></iframe>
+              </div>
+
             </div>
           )}
 
           {/* ======================================================== */}
-          {/* PESTAÑA 3: SOPORTE INTERNO                               */}
+          {/* PESTAÑA 4: SOPORTE INTERNO                               */}
           {/* ======================================================== */}
           {activeTab === 'soporte' && (
             <div className="mx-auto max-w-4xl space-y-6 animate-in fade-in slide-in-from-bottom-4">
@@ -332,7 +367,7 @@ export function AdminView() {
           )}
 
           {/* ======================================================== */}
-          {/* PESTAÑA 4: CLIENTES                                      */}
+          {/* PESTAÑA 5: CLIENTES                                      */}
           {/* ======================================================== */}
           {activeTab === 'clientes' && (
             <div className="rounded-2xl border border-white/10 bg-[#141419] overflow-hidden shadow-xl animate-in fade-in">
