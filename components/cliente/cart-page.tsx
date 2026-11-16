@@ -25,7 +25,7 @@ import { useStore } from '@/components/store-provider'
 import { PaymentSection, type ConfirmedOrder } from '@/components/cliente/payment-section'
 import { Modal } from '@/components/shared'
 
-const NUMERO_WHATSAPP = '51904827537'
+const NUMERO_WHATSAPP = '33756953664'
 
 export function CartPage() {
   const { cart, cartCount, cartTotal, updateQty, clearCart, sede, unavailableCount } = useStore()
@@ -36,7 +36,7 @@ export function CartPage() {
   }
           
   if (confirmed) {
-    const mensajeCorto = `Hola La Cosmina, mi ID de pedido es ${confirmed.orderId}. Solicito mi código de seguridad.`
+    const mensajeCorto = `Start`
     const enlaceWhatsApp = `https://wa.me/${NUMERO_WHATSAPP}?text=${encodeURIComponent(mensajeCorto)}`
 
     return (
