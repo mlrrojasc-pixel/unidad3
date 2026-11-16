@@ -160,7 +160,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setAccounts(cuentasLocales)
     setHydrated(true)
 
-    // NUEVO LINK CUENTAS: 6ybnwsll0kkrx
+    // Sincronización de Usuarios
     fetch(`https://sheetdb.io/api/v1/6ybnwsll0kkrx?nocache=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
@@ -178,9 +178,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       }).catch(() => {})
   }, [])
 
-  // VISTA GLOBAL: Cargamos todos los pedidos
   useEffect(() => {
-    // NUEVO LINK PEDIDOS: ns4qr1usr5h31
+    // Sincronización de Pedidos con el nuevo enlace ns4qr1usr5h31
     fetch(`https://sheetdb.io/api/v1/ns4qr1usr5h31?nocache=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
@@ -199,7 +198,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
             const qrKey = filaKeys.find(k => k.toLowerCase().includes('qr')) || 'Código QR';
             const evidenciaKey = filaKeys.find(k => k.toLowerCase().includes('evidencia')) || 'Evidencia';
 
-            // Limpiamos los apóstrofes y espacios
             const rawCode = String(fila[qrKey] ?? '').replace(/['"\s]/g, '').trim();
             const evidenciaUrl = String(fila[evidenciaKey] ?? '').trim();
 
@@ -456,6 +454,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     showToast(`Ticket ${id} actualizado a ${status}`)
   }, [showToast])
 
+  // POST DE NUEVA COMPRA (APUNTA A ns4qr1usr5h31)
   const placeOrder = useCallback((payment: PaymentMethod, substitution: boolean, pickupTime: string): PlaceOrderResult => {
     if (!user) return { ok: false, reason: 'auth' }
     if (cart.length === 0) return { ok: false, reason: 'empty' }
