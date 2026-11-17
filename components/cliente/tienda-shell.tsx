@@ -34,6 +34,7 @@ export function TiendaShell({ children }: { children: React.ReactNode }) {
             <p className="font-bold">Atención al cliente</p>
             <p className="mt-1 opacity-70">Central: (01) 615-0000</p>
             <p className="opacity-70">ayuda@lacosmina.pe</p>
+            <p className="mt-1 opacity-70">Contacto +51 935 151 171</p>
           </div>
           <div className="text-sm">
             <p className="font-bold">Información</p>
