@@ -179,8 +179,8 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   useEffect(() => {
-    // Sincronización de Pedidos con el nuevo enlace zs4qzkir5i1x0
-    fetch(`https://sheetdb.io/api/v1/zs4qzkir5i1x0?nocache=${Date.now()}`, { cache: 'no-store' })
+    // Sincronización de Pedidos con el nuevo enlace 212ws65v1sffv
+    fetch(`https://sheetdb.io/api/v1/212ws65v1sffv?nocache=${Date.now()}`, { cache: 'no-store' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data) && data.length > 0) {
@@ -363,7 +363,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setCompletedOrders(updatePhoto)
     setDeliveredOrders(updatePhoto)
 
-    fetch(`https://sheetdb.io/api/v1/zs4qzkir5i1x0/ID%20de%20Pedido/${id}`, {
+    fetch(`https://sheetdb.io/api/v1/212ws65v1sffv/ID%20de%20Pedido/${id}`, {
       method: 'PATCH',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: { 'Evidencia': url } })
@@ -384,7 +384,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
     if (photoUrl && typeof window !== 'undefined') window.localStorage.setItem(`evidencia_${id}`, photoUrl);
 
-    fetch(`https://sheetdb.io/api/v1/zs4qzkir5i1x0/ID%20de%20Pedido/${id}`, {
+    fetch(`https://sheetdb.io/api/v1/212ws65v1sffv/ID%20de%20Pedido/${id}`, {
       method: 'PATCH',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({ data: { 'Estado': 'Listo para recoger', 'Evidencia': photoUrl || '' } })
@@ -398,7 +398,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         const nowStr = new Date().toLocaleTimeString('es-PE', { hour: '2-digit', minute: '2-digit', hour12: true })
         setDeliveredOrders((dPrev) => [{ ...orderToDeliver, deliveredAt: nowStr }, ...dPrev.filter((item) => item.id !== id)])
         
-        fetch(`https://sheetdb.io/api/v1/zs4qzkir5i1x0/ID%20de%20Pedido/${id}`, {
+        fetch(`https://sheetdb.io/api/v1/212ws65v1sffv/ID%20de%20Pedido/${id}`, {
           method: 'PATCH',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: { 'Estado': 'Entregado', 'Hora de Entrega': nowStr } })
@@ -425,7 +425,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       const target = next.find(c => c.id === id);
       
       if (target && target.orderId) {
-        fetch(`https://sheetdb.io/api/v1/zs4qzkir5i1x0/ID%20de%20Pedido/${target.orderId}`, {
+        fetch(`https://sheetdb.io/api/v1/212ws65v1sffv/ID%20de%20Pedido/${target.orderId}`, {
           method: 'PATCH',
           headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
           body: JSON.stringify({ data: { 'Reembolso': status === 'Aprobado' ? 'Reembolso procesado' : 'Rechazado' } })
@@ -454,7 +454,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     showToast(`Ticket ${id} actualizado a ${status}`)
   }, [showToast])
 
-  // POST DE NUEVA COMPRA (APUNTA A zs4qzkir5i1x0)
+  // POST DE NUEVA COMPRA (APUNTA A 212ws65v1sffv)
   const placeOrder = useCallback((payment: PaymentMethod, substitution: boolean, pickupTime: string): PlaceOrderResult => {
     if (!user) return { ok: false, reason: 'auth' }
     if (cart.length === 0) return { ok: false, reason: 'empty' }
@@ -482,7 +482,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setOrders((prev) => [...prev, newOrder])
     setCartQty({})
 
-    fetch('https://sheetdb.io/api/v1/zs4qzkir5i1x0', {
+    fetch('https://sheetdb.io/api/v1/212ws65v1sffv', {
       method: 'POST',
       headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
       body: JSON.stringify({
